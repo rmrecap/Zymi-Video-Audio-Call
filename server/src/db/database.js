@@ -24,7 +24,9 @@ export const initDatabase = (dbName = 'zymi.db') => {
   if (db) return db;
   
   const dataDir = ensureDataDir();
-  const dbPath = path.join(dataDir, dbName);
+  // Security: Prevent path traversal by using path.basename
+  const safeDbName = path.basename(dbName);
+  const dbPath = path.join(dataDir, safeDbName);
   
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');

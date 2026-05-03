@@ -10,7 +10,7 @@ Date: 2026-04-26
 
 Run server in production mode:
 ```bash
-NODE_ENV=production JWT_SECRET=test_secret_64_characters_long_enough_for_hs256_verification node server/index.js
+NODE_ENV=production JWT_SECRET=[YOUR_JWT_SECRET] node server/index.js
 ```
 
 ## Test Cases

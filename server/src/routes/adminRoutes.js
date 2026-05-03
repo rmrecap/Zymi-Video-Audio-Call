@@ -319,9 +319,12 @@ export const exportData = (req, res) => {
 
   // Export sanitized data from each table
   tableNames.forEach(table => {
-    if (['users', 'messages', 'call_history', 'admin_audit_logs', 'message_reports', 'blocked_users'].includes(table)) {
+    const allowedTables = ['users', 'messages', 'call_history', 'admin_audit_logs', 'message_reports', 'blocked_users'];
+    if (allowedTables.includes(table)) {
       try {
-        const rows = all(`SELECT * FROM ${table}`);
+        // Strict mapping to prevent any potential interpolation risk
+        const targetTable = allowedTables.find(t => t === table);
+        const rows = all(`SELECT * FROM ${targetTable}`);
         // Sanitize: remove sensitive fields
         const sanitized = rows.map(row => {
           const sanitizedRow = { ...row };

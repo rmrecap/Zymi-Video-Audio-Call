@@ -99,8 +99,9 @@ export const saveMessageFile = (buffer, originalFilename, senderId) => {
 };
 
 export const deleteMessageFile = (relativePath) => {
-  if (relativePath && !relativePath.includes('..') && relativePath.startsWith('/uploads/messages/')) {
-    const filepath = path.join(__dirname, '../../../../', relativePath);
+  if (relativePath && !relativePath.includes('..')) {
+    const filename = path.basename(relativePath);
+    const filepath = path.join(MESSAGE_UPLOAD_DIR, filename);
     if (fs.existsSync(filepath)) {
       fs.unlinkSync(filepath);
     }
@@ -109,5 +110,6 @@ export const deleteMessageFile = (relativePath) => {
 
 export const getAvatarPath = (relativePath) => {
   if (!relativePath) return null;
-  return path.join(__dirname, '../../../../', relativePath);
+  const filename = path.basename(relativePath);
+  return path.join(AVATAR_UPLOAD_DIR, filename);
 };

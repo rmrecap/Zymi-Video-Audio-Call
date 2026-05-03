@@ -79,7 +79,7 @@ services:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:5000}
       - VITE_SOCKET_URL=${VITE_SOCKET_URL:-http://localhost:5000}
     ports:
-      - "5175:80"
+      - "5175:8080"
     restart: unless-stopped
     networks:
       - qibo-network

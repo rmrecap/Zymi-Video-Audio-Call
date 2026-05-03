@@ -52,7 +52,10 @@ export const getAvatar = async (req, res) => {
     return res.status(404).json({ error: 'Avatar not found' });
   }
 
-  const avatarPath = path.join(__dirname, '../../../../', user.avatar);
+  // Security: Prevent path traversal by using path.basename
+  const safeAvatarName = path.basename(user.avatar);
+  const avatarPath = path.join(__dirname, '../../../../uploads/avatars', safeAvatarName);
+  
   if (!fs.existsSync(avatarPath)) {
     return res.status(404).json({ error: 'Avatar file missing' });
   }
@@ -121,7 +124,10 @@ export const uploadMessageFile = (req, res) => {
 export const getMessageFile = async (req, res) => {
   const { filename } = req.params;
 
-  const filePath = path.join(__dirname, '../../../../uploads/messages', filename);
+  // Security: Prevent path traversal by using path.basename
+  const safeFilename = path.basename(filename);
+  const filePath = path.join(__dirname, '../../../../uploads/messages', safeFilename);
+  
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'File not found' });
   }

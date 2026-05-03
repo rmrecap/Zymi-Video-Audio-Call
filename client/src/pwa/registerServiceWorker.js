@@ -66,8 +66,10 @@ self.addEventListener('fetch', (event) => {
         })
     );
   } else {
-    // For external requests (socket.io, CDNs) - bypass cache
-    event.respondWith(fetch(request));
+    // Security: Only allow http/https protocols to prevent potential SSRF-like behavior
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      event.respondWith(fetch(request));
+    }
   }
 });
 
