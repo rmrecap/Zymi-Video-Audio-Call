@@ -7,6 +7,7 @@ import { registerActiveCall, clearActiveCall, cleanupUserActiveCall } from './ca
 
 import { get } from '../db/database.js';
 import { isBlocked } from '../routes/blockRoutes.js';
+import * as inAppNotificationService from '../services/inAppNotificationService.js';
 
 const checkToken = (socket, userId) => {
   try {
@@ -99,6 +100,16 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
                 safeBroadcast(userSockets.get(from), SOCKET_EVENTS.CALL_TIMEOUT, { to, callId: timedOutCall.id });
                 safeBroadcast(targetSocketId, SOCKET_EVENTS.CALL_REJECTED, { reason: 'Call timed out' });
                 logAudit(from, 'call_timeout', to, `Call timed out after ${CALL_TIMEOUT_MS}ms`);
+
+                // Phase 57: Missed call notification
+                const caller = get('SELECT username FROM users WHERE id = ?', from);
+                inAppNotificationService.createNotification({
+                  user_id: to,
+                  type: 'call_missed',
+                  title: 'Missed Call',
+                  body: `You missed a call from ${caller?.username || 'Unknown'}`,
+                  related_user_id: from
+                });
               }
             }
           } catch (timeoutErr) {
@@ -231,6 +242,25 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
       console.log('[CALL_SOCKET] User disconnected:', socket.id);
       if (socket.userId) {
         cleanupUserActiveCall(socket.userId, io, userSockets);
+      }
+    });
+
+    // Phase 59: Connectivity Additive Events
+    socket.on('ice-retry-requested', (data) => {
+      const { to, reason } = data;
+      if (!to) return;
+      const targetSocket = userSockets.get(String(to));
+      if (targetSocket) {
+        io.to(targetSocket).emit('ice-retry-requested', { from: socket.userId, reason });
+      }
+    });
+
+    socket.on('relay-mode-activated', (data) => {
+      const { to } = data;
+      if (!to) return;
+      const targetSocket = userSockets.get(String(to));
+      if (targetSocket) {
+        io.to(targetSocket).emit('relay-mode-activated', { from: socket.userId });
       }
     });
   });

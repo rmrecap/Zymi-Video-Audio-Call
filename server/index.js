@@ -64,6 +64,11 @@ import { uploadAvatar, getAvatar, deleteUserAvatar, uploadMessageFile, getMessag
 import adminFeatureRoutes from './src/routes/adminFeatureRoutes.js';
 import nearbyRoutes from './src/routes/nearbyRoutes.js';
 import adControlRoutes from './src/routes/adControlRoutes.js';
+import userLookupRoutes from './src/routes/userLookupRoutes.js';
+import authRouter from './src/routes/authRoutes.js';
+import otpRoutes from './src/routes/otpRoutes.js';
+import emailSettingsRoutes from './src/routes/emailSettingsRoutes.js';
+import projectBrainRoutes from './src/routes/projectBrainRoutes.js';
 
 // Global error handlers for server stability
 process.on('unhandledRejection', (reason, promise) => {
@@ -172,6 +177,31 @@ app.get('/uploads/messages/:filename', getMessageFile);
 
 // Nearby Discovery Routes
 app.use('/api/nearby', nearbyRoutes);
+
+// User Lookup Routes
+app.use('/api/users', userLookupRoutes);
+
+// Phase 57: Messaging & Notifications
+import messageRoutes from './src/routes/messageRoutes.js';
+import notificationRoutes from './src/routes/notificationRoutes.js';
+import mediaRoutes from './src/routes/mediaRoutes.js';
+import turnRoutes from './src/routes/turnRoutes.js';
+import connectivityRoutes from './src/routes/connectivityRoutes.js';
+app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/turn', turnRoutes);
+app.use('/api/connectivity', connectivityRoutes);
+
+// Phase 54: Advanced Auth & OTP Routes
+app.use('/api/auth', authRouter);
+app.use('/api/otp', otpRoutes);
+app.get('/verify/phone/:token', (req, res) => {
+  // Redirect to the API handler or just import it
+  res.redirect(`/api/otp/phone/verify/${req.params.token}`);
+});
+app.use('/api/admin', emailSettingsRoutes);
+app.use('/api/admin/project-brain', projectBrainRoutes);
 
 // Health check routes
 app.use(healthRoutes);

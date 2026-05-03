@@ -1,36 +1,47 @@
 import bcrypt from 'bcryptjs';
 import { get, run } from '../db/database.js';
 import { createToken } from '../services/sessionService.js';
+import { logAudit } from '../services/auditService.js';
+import { requestEmailOTP, verifyEmailOTP } from '../services/otpService.js';
+import { updateProfileCompletion } from '../services/profileCompletionService.js';
 
 export const register = (req, res) => {
-  const { username, password } = req.body;
+  const { username, email, password } = req.body;
 
-  console.log('[REGISTER] Body:', req.body);
-  console.log('[REGISTER] Username:', username);
-
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: 'Username, email and password required' });
   }
 
   try {
     const hash = bcrypt.hashSync(password, 12);
-    const result = run('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', username, hash, 'user');
-    const user = get('SELECT id, username, role, token_version FROM users WHERE id = ?', result.lastInsertRowid);
+    const result = run(
+      'INSERT INTO users (username, email, password, role, profile_completion) VALUES (?, ?, ?, ?, ?)', 
+      username, email, hash, 'user', 40
+    );
+    const user = get('SELECT id, username, email, role, token_version FROM users WHERE id = ?', result.lastInsertRowid);
     const token = createToken(user);
-    res.json({ id: user.id, username: user.username, role: user.role, token });
+    
+    // Mask email for auditing
+    const maskedEmail = email.replace(/(.{2}).*(@.*)/, '$1***$2');
+    logAudit(user.id, 'user_registered', user.id, `User registered with email: ${maskedEmail}`);
+
+    res.json({ id: user.id, username: user.username, email: user.email, role: user.role, token });
   } catch (err) {
+    if (err.message.includes('UNIQUE constraint failed: users.email')) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
     res.status(400).json({ error: 'Username already exists' });
   }
 };
 
 export const login = (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body; // username can be email or username
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+    return res.status(400).json({ error: 'Credentials and password required' });
   }
 
-  const user = get('SELECT * FROM users WHERE username = ?', username);
+  const user = get('SELECT * FROM users WHERE username = ? OR email = ?', username, username);
 
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: 'Invalid credentials' });
@@ -40,34 +51,89 @@ export const login = (req, res) => {
     return res.status(403).json({ error: 'Account suspended' });
   }
 
+  run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', user.id);
+
   const token = createToken(user);
   res.json({
     id: user.id,
     username: user.username,
+    email: user.email,
     role: user.role,
     token
   });
 };
 
+export const logout = (req, res) => {
+  // Client handles token removal, but we can log it
+  logAudit(req.user?.id, 'user_logout', req.user?.id, 'User logged out');
+  res.json({ success: true });
+};
+
+export const me = (req, res) => {
+  const user = get(`
+    SELECT id, username, email, role, email_verified, phone_verified, 
+           profile_completion, country_code, country_name, phone_country_iso, 
+           phone_normalized, verification_status, last_login_at, avatar
+    FROM users WHERE id = ?
+  `, req.user.id);
+  
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json(user);
+};
+
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+
+  const user = get('SELECT id, email FROM users WHERE email = ?', email);
+  if (!user) {
+    // Return success anyway to prevent user enumeration
+    return res.json({ success: true, message: 'If email exists, OTP sent.' });
+  }
+
+  try {
+    await requestEmailOTP(user.id, user.email);
+    res.json({ success: true, message: 'OTP sent to your email' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
+export const resetPassword = (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields required' });
+
+  const user = get('SELECT id FROM users WHERE email = ?', email);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const verify = verifyEmailOTP(user.id, otp);
+  if (!verify.success) return res.status(400).json({ error: verify.error });
+
+  const hash = bcrypt.hashSync(newPassword, 12);
+  run('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?', hash, user.id);
+  
+  logAudit(user.id, 'password_reset', user.id, 'User reset password via OTP');
+  res.json({ success: true, message: 'Password updated successfully' });
+};
+
 export const adminLogin = (req, res) => {
   const { username, password } = req.body;
-  console.log('[AUTH] Admin login attempt:', username);
-
+  
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
-  const admin = get('SELECT * FROM users WHERE username = ? AND role IN (?, ?)', username, 'admin', 'super_admin');
+  const admin = get('SELECT * FROM users WHERE (username = ? OR email = ?) AND role IN (?, ?)', username, username, 'admin', 'super_admin');
 
   if (!admin) {
-    console.log('[AUTH] Admin user not found:', username);
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
   if (!bcrypt.compareSync(password, admin.password)) {
-    console.log('[AUTH] Invalid password for admin:', username);
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
+
+  run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', admin.id);
 
   const token = createToken(admin);
   res.json({
@@ -75,3 +141,19 @@ export const adminLogin = (req, res) => {
     admin: { id: admin.id, username: admin.username, role: admin.role }
   });
 };
+
+// Router (placed after all handlers to avoid hoisting issues with const arrow functions)
+import { Router } from 'express';
+import { requireAuth } from '../middleware/authMiddleware.js';
+import { authRateLimit } from '../middleware/rateLimit.js';
+
+const router = Router();
+
+router.post('/register', register);
+router.post('/login', authRateLimit(), login);
+router.post('/logout', requireAuth, logout);
+router.get('/me', requireAuth, me);
+router.post('/forgot-password', authRateLimit(), forgotPassword);
+router.post('/reset-password', authRateLimit(), resetPassword);
+
+export default router;

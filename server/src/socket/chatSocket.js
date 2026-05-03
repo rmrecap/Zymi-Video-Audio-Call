@@ -4,6 +4,9 @@ import { incrementMessagesToday, incrementTypingEvents, incrementDisconnects } f
 import { shouldBroadcastOnline } from '../services/presenceService.js';
 import { getUserSocketRegistry } from './userSocketRegistry.js';
 import { cleanupUserActiveCall } from './callState.js';
+import * as messageQueueService from '../services/messageQueueService.js';
+import * as unreadCounterService from '../services/unreadCounterService.js';
+import * as inAppNotificationService from '../services/inAppNotificationService.js';
 
 const checkToken = (socket, userId) => {
   try {
@@ -46,6 +49,18 @@ export const setupChatSocket = (io, userSockets) => {
 
         userSockets.set(normalizedUserId, socket.id);
 
+        // Phase 57: Sync pending messages when user joins
+        const pendingMessages = messageQueueService.getPendingMessages(normalizedUserId);
+        if (pendingMessages.length > 0) {
+          socket.emit('sync-pending-messages', pendingMessages);
+          // Mark as delivered once emitted
+          messageQueueService.markMessagesAsDelivered(normalizedUserId);
+        }
+
+        // Sync unread count
+        const unreadTotal = unreadCounterService.getTotalUnread(normalizedUserId);
+        socket.emit('unread-count-updated', { total: unreadTotal });
+
         // Shadow write to Redis registry (dev-only)
         if (process.env.REDIS_SOCKET_REGISTRY_SHADOW === 'true' && process.env.NODE_ENV !== 'production') {
           try {
@@ -67,7 +82,7 @@ export const setupChatSocket = (io, userSockets) => {
       }
     });
 
-socket.on(SOCKET_EVENTS.PRIVATE_MESSAGE, (data) => {
+    socket.on(SOCKET_EVENTS.PRIVATE_MESSAGE, async (data) => {
       try {
         let { to, from, content, tempId, message_type, file_url, file_name, file_size, mime_type, location_lat, location_lng } = data || {};
 
@@ -83,23 +98,36 @@ socket.on(SOCKET_EVENTS.PRIVATE_MESSAGE, (data) => {
           return;
         }
 
-        const targetUser = get('SELECT is_banned FROM users WHERE id = ?', to);
+        const targetUser = get('SELECT is_banned, username FROM users WHERE id = ?', to);
         if (targetUser?.is_banned) return;
+
+        // Phase 57: Conversation ID logic (smaller_greater)
+        const ids = [from, to].sort((a, b) => parseInt(a) - parseInt(b));
+        const conversationId = ids.join('_');
 
         // Build message content - fallback to type description if media
         const messageContent = content || (message_type === 'location' ? 'Shared location' : 'Media');
 
-        // Insert with optional media fields
-        const result = run(
-          'INSERT INTO messages (sender_id, receiver_id, content, message_type, file_url, file_name, file_size, mime_type, location_lat, location_lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          from, to, messageContent, message_type || 'text', file_url || null, file_name || null, file_size || null, mime_type || null, location_lat || null, location_lng || null
-        );
+        const targetSocketId = userSockets.get(to);
+        const isOnline = !!targetSocketId;
 
-        const message = {
-          id: result.lastInsertRowid,
+        // Phase 57: Store message with delivery status
+        const messageId = messageQueueService.enqueueMessage({
           sender_id: from,
           receiver_id: to,
           content: messageContent,
+          message_type: message_type || 'text',
+          client_message_id: tempId,
+          conversation_id: conversationId,
+          delivery_status: isOnline ? 'sent' : 'queued'
+        });
+
+        const message = {
+          id: messageId,
+          sender_id: from,
+          receiver_id: to,
+          content: messageContent,
+          message_text: messageContent,
           message_type: message_type || 'text',
           file_url,
           file_name,
@@ -108,17 +136,33 @@ socket.on(SOCKET_EVENTS.PRIVATE_MESSAGE, (data) => {
           location_lat,
           location_lng,
           timestamp: new Date().toISOString(),
-          tempId
+          created_at: new Date().toISOString(),
+          tempId,
+          conversation_id: conversationId,
+          delivery_status: isOnline ? 'sent' : 'queued'
         };
 
+        // Emit back to sender
         io.to(socket.id).emit(SOCKET_EVENTS.NEW_MESSAGE, message);
-        io.to(socket.id).emit('receive_message', message);
         io.to(socket.id).emit('message-sent', { tempId, id: message.id });
 
-        const targetSocketId = userSockets.get(to);
-        if (targetSocketId) {
+        if (isOnline) {
           io.to(targetSocketId).emit(SOCKET_EVENTS.NEW_MESSAGE, { ...message, tempId: undefined });
           io.to(targetSocketId).emit('receive_message', { ...message, tempId: undefined });
+        } else {
+          // Phase 57: Notification for offline user
+          const sender = get('SELECT username FROM users WHERE id = ?', from);
+          inAppNotificationService.createNotification({
+            user_id: to,
+            type: 'message',
+            title: `New message from ${sender?.username || 'Unknown'}`,
+            body: messageContent.length > 50 ? messageContent.substring(0, 47) + '...' : messageContent,
+            related_user_id: from,
+            related_conversation_id: conversationId
+          });
+          
+          // Increment unread for offline user
+          unreadCounterService.incrementUnread(to, conversationId);
         }
 
         incrementMessagesToday();
@@ -183,6 +227,93 @@ socket.on(SOCKET_EVENTS.PRIVATE_MESSAGE, (data) => {
         }
       } catch (err) {
         console.error('[CHAT_SOCKET] message-read error:', err);
+      }
+    });
+
+    // Phase 58: Media Transfer Signaling
+    socket.on('media-transfer-offer', (data) => {
+      try {
+        const { to, fileId, metadata } = data || {};
+        if (!to || !fileId) return;
+        const targetSocketId = userSockets.get(String(to));
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('media-transfer-offer', { from: socket.userId, fileId, metadata });
+        }
+      } catch (err) {
+        console.error('[CHAT_SOCKET] media-transfer-offer error:', err);
+      }
+    });
+
+    socket.on('media-transfer-accept', (data) => {
+      try {
+        const { to, fileId, signalData } = data || {};
+        if (!to || !fileId) return;
+        const targetSocketId = userSockets.get(String(to));
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('media-transfer-accept', { from: socket.userId, fileId, signalData });
+        }
+      } catch (err) {
+        console.error('[CHAT_SOCKET] media-transfer-accept error:', err);
+      }
+    });
+
+    socket.on('media-transfer-ready', (data) => {
+      try {
+        const { to, fileId } = data || {};
+        const targetSocketId = userSockets.get(String(to));
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('media-transfer-ready', { from: socket.userId, fileId });
+        }
+      } catch (err) {
+        console.error('[CHAT_SOCKET] media-transfer-ready error:', err);
+      }
+    });
+
+    socket.on('media-transfer-progress', (data) => {
+      try {
+        const { to, fileId, progress } = data || {};
+        const targetSocketId = userSockets.get(String(to));
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('media-transfer-progress', { from: socket.userId, fileId, progress });
+        }
+      } catch (err) {
+        console.error('[CHAT_SOCKET] media-transfer-progress error:', err);
+      }
+    });
+
+    socket.on('media-transfer-completed', (data) => {
+      try {
+        const { to, fileId } = data || {};
+        const targetSocketId = userSockets.get(String(to));
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('media-transfer-completed', { from: socket.userId, fileId });
+        }
+      } catch (err) {
+        console.error('[CHAT_SOCKET] media-transfer-completed error:', err);
+      }
+    });
+
+    socket.on('media-transfer-failed', (data) => {
+      try {
+        const { to, fileId, reason } = data || {};
+        const targetSocketId = userSockets.get(String(to));
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('media-transfer-failed', { from: socket.userId, fileId, reason });
+        }
+      } catch (err) {
+        console.error('[CHAT_SOCKET] media-transfer-failed error:', err);
+      }
+    });
+
+    socket.on('media-transfer-cancelled', (data) => {
+      try {
+        const { to, fileId } = data || {};
+        const targetSocketId = userSockets.get(String(to));
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('media-transfer-cancelled', { from: socket.userId, fileId });
+        }
+      } catch (err) {
+        console.error('[CHAT_SOCKET] media-transfer-cancelled error:', err);
       }
     });
 

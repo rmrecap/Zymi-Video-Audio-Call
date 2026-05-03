@@ -4,6 +4,7 @@ import Login from './components/Login.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import AdminPanel from './components/admin/AdminPanel.jsx';
 import AdminLogin from './components/admin/AdminLogin.jsx';
+import { API_URL } from './config/api.js';
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -57,6 +58,30 @@ function App() {
     localStorage.removeItem('zymi_admin');
     setAdmin(null);
     setTimeout(() => setIsLoggingOut(false), 100);
+  }, []);
+
+  useEffect(() => {
+    const refreshUser = async () => {
+      const token = localStorage.getItem('zymi_token');
+      if (token && user) {
+        try {
+          const res = await fetch(`${API_URL}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const fullUser = await res.json();
+            const userInfo = { ...fullUser, token };
+            localStorage.setItem('zymi_user', JSON.stringify(userInfo));
+            setUser(userInfo);
+          } else if (res.status === 401 || res.status === 403) {
+            handleLogout();
+          }
+        } catch (err) {
+          console.error('Failed to refresh user data:', err);
+        }
+      }
+    };
+    refreshUser();
   }, []);
 
   useEffect(() => {

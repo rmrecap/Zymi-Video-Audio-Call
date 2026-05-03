@@ -1,0 +1,3 @@
+class ZymiMobileTheme {
+  // Theme definitions
+}

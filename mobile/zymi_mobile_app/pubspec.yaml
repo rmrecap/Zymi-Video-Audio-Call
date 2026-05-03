@@ -1,0 +1,23 @@
+name: zymi_mobile_app
+description: ZYMI Mobile App
+version: 1.0.0+1
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_mobile_ads: ^5.0.0
+  http: ^1.1.0
+  shared_preferences: ^2.2.0
+  socket_io_client: ^2.0.2
+  flutter_webrtc: ^0.12.7
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true

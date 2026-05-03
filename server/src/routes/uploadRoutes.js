@@ -19,7 +19,7 @@ export const uploadAvatar = (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const validation = validateAvatar(req.file.buffer, req.file.mimetype);
+  const validation = validateAvatar(req.file.buffer, req.file.mimetype, req.file.originalname);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.error });
   }

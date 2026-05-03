@@ -917,6 +917,33 @@ const handleSelectUser = (u) => {
         </div>
       )}
 
+      {user.profile_completion < 100 && (
+        <div className="verification-banner" style={{
+          background: 'linear-gradient(90deg, #3b82f622, #1e293b88)',
+          padding: '10px 20px',
+          borderBottom: '1px solid #3b82f633',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '13px',
+          color: '#e2e8f0',
+          backdropFilter: 'blur(10px)',
+          zIndex: 100
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <span style={{ fontWeight: 'bold', color: '#3b82f6' }}>{user.profile_completion}% VERIFIED</span>
+            <div style={{ width: '100px', height: '6px', background: '#ffffff11', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ width: `${user.profile_completion}%`, height: '100%', background: '#3b82f6' }} />
+            </div>
+            <span>Complete verification to secure your account.</span>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {!user.email_verified && <span style={{ color: '#fbbf24', fontSize: '11px', background: '#fbbf2411', padding: '2px 8px', borderRadius: '10px', border: '1px solid #fbbf2433' }}>Email Pending</span>}
+            {!user.phone_verified && <span style={{ color: '#fbbf24', fontSize: '11px', background: '#fbbf2411', padding: '2px 8px', borderRadius: '10px', border: '1px solid #fbbf2433' }}>Phone Pending</span>}
+          </div>
+        </div>
+      )}
+
       <PremiumChatShell
         sidebar={
           <PremiumChatSidebar

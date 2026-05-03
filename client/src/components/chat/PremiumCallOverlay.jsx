@@ -71,7 +71,11 @@ const PremiumCallOverlay = ({
       {!isVideo && (
         <div className="zy-audio-call-center">
           <div className="zy-audio-avatar-large">
-            {caller.avatar ? <img src={caller.avatar} alt="" /> : (caller.name || caller.username || '?')[0].toUpperCase()}
+            {(selectedUser?.avatar || incomingCall?.caller?.avatar) ? (
+              <img src={selectedUser?.avatar || incomingCall?.caller?.avatar} alt="" />
+            ) : (
+              getCallerName()[0].toUpperCase()
+            )}
             <div className="zy-audio-waves">
               <span /><span /><span />
             </div>

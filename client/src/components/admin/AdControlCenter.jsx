@@ -9,6 +9,8 @@ const AdControlCenter = ({ admin }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('global');
   const [message, setMessage] = useState('');
+  const [warnings, setWarnings] = useState([]);
+  const [showRollbackModal, setShowRollbackModal] = useState(false);
 
   const token = localStorage.getItem('adminToken');
   const authHeader = { headers: { Authorization: `Bearer ${token}` } };
@@ -57,54 +59,124 @@ const AdControlCenter = ({ admin }) => {
     }
   };
 
-  const updateGlobal = async (newSettings) => {
+  const validateAndExecute = async (payload, executeFn) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/ad-control/global`, {
+      const validatePayload = {
+        global: payload.global || config.global,
+        networks: payload.networks || config.networks,
+        placements: payload.placements || config.placements,
+        countryRules: payload.countryRules || config.countryRules,
+        versionRules: payload.versionRules || config.versionRules
+      };
+
+      const valRes = await fetch(`${API_URL}/api/admin/ad-control/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeader.headers },
-        body: JSON.stringify(newSettings)
+        body: JSON.stringify(validatePayload)
       });
-      if (res.ok) {
-        setMessage('Global settings updated successfully');
-        fetchData();
-        fetchAudit();
+      
+      const validation = await valRes.json();
+      if (validation.errors && validation.errors.length > 0) {
+        setMessage(`Validation Error: ${validation.errors[0]}`);
+        return;
       }
+      if (validation.warnings && validation.warnings.length > 0) {
+        setWarnings(validation.warnings);
+      } else {
+        setWarnings([]);
+      }
+      
+      await executeFn();
     } catch (err) {
-      setMessage('Update failed');
+      console.error('Validation failed', err);
+      setMessage('Validation check failed');
     }
+  };
+
+  const updateGlobal = async (newSettings) => {
+    validateAndExecute({ global: newSettings }, async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/admin/ad-control/global`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader.headers },
+          body: JSON.stringify(newSettings)
+        });
+        if (res.ok) {
+          setMessage('Global settings updated successfully');
+          fetchData();
+          fetchAudit();
+        }
+      } catch (err) {
+        setMessage('Update failed');
+      }
+    });
   };
 
   const updateNetwork = async (netConfig) => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/ad-control/network`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader.headers },
-        body: JSON.stringify(netConfig)
-      });
-      if (res.ok) {
-        setMessage(`${netConfig.network_key} updated successfully`);
-        fetchData();
-        fetchAudit();
+    const newNetworks = config.networks.map(n => n.network_key === netConfig.network_key ? netConfig : n);
+    validateAndExecute({ networks: newNetworks }, async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/admin/ad-control/network`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader.headers },
+          body: JSON.stringify(netConfig)
+        });
+        if (res.ok) {
+          setMessage(`${netConfig.network_key} updated successfully`);
+          fetchData();
+          fetchAudit();
+        }
+      } catch (err) {
+        setMessage('Update failed');
       }
-    } catch (err) {
-      setMessage('Update failed');
-    }
+    });
   };
 
   const togglePlacement = async (placement) => {
+    const newPlacement = { ...placement, enabled: placement.enabled ? 0 : 1 };
+    const newPlacements = config.placements.map(p => p.placement_key === placement.placement_key ? newPlacement : p);
+    
+    validateAndExecute({ placements: newPlacements }, async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/admin/ad-control/placement`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader.headers },
+          body: JSON.stringify(newPlacement)
+        });
+        if (res.ok) {
+          fetchData();
+          fetchAudit();
+        }
+      } catch (err) {
+        setMessage('Toggle failed');
+      }
+    });
+  };
+
+  const handleRollback = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/ad-control/placement`, {
+      const res = await fetch(`${API_URL}/api/admin/ad-control/rollback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader.headers },
-        body: JSON.stringify({ ...placement, enabled: placement.enabled ? 0 : 1 })
+        headers: { 'Content-Type': 'application/json', ...authHeader.headers }
       });
       if (res.ok) {
+        setMessage('Rollback successful');
         fetchData();
         fetchAudit();
+        setShowRollbackModal(false);
+      } else {
+        const data = await res.json();
+        setMessage(`Rollback failed: ${data.error}`);
+        setShowRollbackModal(false);
       }
     } catch (err) {
-      setMessage('Toggle failed');
+      setMessage('Rollback failed');
+      setShowRollbackModal(false);
     }
+  };
+
+  const handleExport = () => {
+    window.open(`${API_URL}/api/admin/ad-control/export`, '_blank');
   };
 
   if (loading) return <div className="zy-loading-placeholder">Loading Ad Control Center...</div>;
@@ -145,9 +217,31 @@ const AdControlCenter = ({ admin }) => {
         <button className={activeTab === 'contract' ? 'active' : ''} onClick={() => setActiveTab('contract')}>Mobile Contract</button>
         <button className={activeTab === 'rules' ? 'active' : ''} onClick={() => setActiveTab('rules')}>Rules & Geo</button>
         <button className={activeTab === 'audit' ? 'active' : ''} onClick={() => setActiveTab('audit')}>Audit Logs</button>
+        <div style={{marginLeft: 'auto', display: 'flex', gap: '10px'}}>
+          <button className="zy-admin-btn small" onClick={() => setShowRollbackModal(true)}>Rollback Last Config</button>
+          <button className="zy-admin-btn small" onClick={handleExport}>Export Config JSON</button>
+        </div>
       </div>
 
       {message && <div className="zy-admin-toast" onClick={() => setMessage('')}>{message}</div>}
+      {warnings.length > 0 && (
+        <div className="zy-admin-toast warning" onClick={() => setWarnings([])}>
+          Warnings: {warnings.join(' | ')}
+        </div>
+      )}
+
+      {showRollbackModal && (
+        <div className="zy-modal-overlay">
+          <div className="zy-modal-content glass">
+            <h2>Confirm Rollback</h2>
+            <p>Are you sure you want to rollback to the previous configuration? This action is highly sensitive.</p>
+            <div className="zy-modal-actions">
+              <button className="zy-admin-btn" onClick={() => setShowRollbackModal(false)}>Cancel</button>
+              <button className="zy-admin-btn danger" onClick={handleRollback}>Yes, Rollback Last Config</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="zy-ad-content">
         {activeTab === 'global' && (

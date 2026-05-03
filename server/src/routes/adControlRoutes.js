@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAdmin } from '../middleware/authMiddleware.js';
 import { adConfigService } from '../services/adConfigService.js';
 import { adConfigSafetyService } from '../services/adConfigSafetyService.js';
+import { adConfigValidator } from '../services/adConfigValidator.js';
 
 const router = express.Router();
 
@@ -122,6 +123,37 @@ router.get('/admin/ad-control/audit', requireAdmin, (req, res) => {
   try {
     const logs = adConfigService.getAuditLogs();
     res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/admin/ad-control/validate', requireAdmin, (req, res) => {
+  try {
+    const { global, networks, placements, countryRules, versionRules } = req.body;
+    const validation = adConfigValidator.validateConfig(global, networks, placements, countryRules, versionRules);
+    res.json(validation);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/admin/ad-control/rollback', requireAdmin, (req, res) => {
+  try {
+    const result = adConfigService.rollbackToLastSnapshot(req.adminUser.id);
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+    res.json({ message: 'Rollback successful' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/admin/ad-control/export', requireAdmin, (req, res) => {
+  try {
+    const data = adConfigService.exportConfig();
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

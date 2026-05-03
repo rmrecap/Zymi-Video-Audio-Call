@@ -84,10 +84,26 @@ export const runMigrations = () => {
      console.log('[MIGRATION] Added country column to users');
    }
 
-   if (!columnExists('users', 'city')) {
-     exec("ALTER TABLE users ADD COLUMN city TEXT");
-     console.log('[MIGRATION] Added city column to users');
-   }
+    if (!columnExists('users', 'city')) {
+      exec("ALTER TABLE users ADD COLUMN city TEXT");
+      console.log('[MIGRATION] Added city column to users');
+    }
+
+    if (!columnExists('users', 'phone')) {
+      exec("ALTER TABLE users ADD COLUMN phone TEXT");
+      console.log('[MIGRATION] Added phone column to users');
+    }
+
+    if (!columnExists('users', 'phone_normalized')) {
+      exec("ALTER TABLE users ADD COLUMN phone_normalized TEXT");
+      exec("CREATE INDEX IF NOT EXISTS idx_users_phone_normalized ON users(phone_normalized)");
+      console.log('[MIGRATION] Added phone_normalized column and index to users');
+    }
+
+    if (!columnExists('users', 'phone_verified')) {
+      exec("ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0");
+      console.log('[MIGRATION] Added phone_verified column to users');
+    }
   
   if (!tableExists('messages')) {
     exec(`
@@ -456,6 +472,354 @@ if (!columnExists('messages', 'previous_content')) {
     if (!columnExists('ad_config_audit_logs', 'risk_level')) {
       exec("ALTER TABLE ad_config_audit_logs ADD COLUMN risk_level TEXT DEFAULT 'LOW'");
     }
+  }
+
+  if (!columnExists('users', 'email')) {
+    exec("ALTER TABLE users ADD COLUMN email TEXT");
+    exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)");
+    console.log('[MIGRATION] Added email column to users');
+  }
+
+  if (!columnExists('users', 'email_verified')) {
+    exec("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0");
+    console.log('[MIGRATION] Added email_verified column to users');
+  }
+
+  if (!columnExists('users', 'profile_completion')) {
+    exec("ALTER TABLE users ADD COLUMN profile_completion INTEGER DEFAULT 40");
+    console.log('[MIGRATION] Added profile_completion column to users');
+  }
+
+  if (!columnExists('users', 'country_code')) {
+    exec("ALTER TABLE users ADD COLUMN country_code TEXT");
+    console.log('[MIGRATION] Added country_code column to users');
+  }
+
+  if (!columnExists('users', 'country_name')) {
+    exec("ALTER TABLE users ADD COLUMN country_name TEXT");
+    console.log('[MIGRATION] Added country_name column to users');
+  }
+
+  if (!columnExists('users', 'phone_country_iso')) {
+    exec("ALTER TABLE users ADD COLUMN phone_country_iso TEXT");
+    console.log('[MIGRATION] Added phone_country_iso column to users');
+  }
+
+  if (!columnExists('users', 'verification_status')) {
+    exec("ALTER TABLE users ADD COLUMN verification_status TEXT DEFAULT 'pending'");
+    console.log('[MIGRATION] Added verification_status column to users');
+  }
+
+  if (!columnExists('users', 'last_login_at')) {
+    exec("ALTER TABLE users ADD COLUMN last_login_at DATETIME");
+    console.log('[MIGRATION] Added last_login_at column to users');
+  }
+
+  if (!tableExists('email_settings')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS email_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        provider TEXT DEFAULT 'gmail', -- 'gmail' or 'smtp'
+        smtp_host TEXT,
+        smtp_port INTEGER,
+        smtp_user TEXT,
+        smtp_pass TEXT, -- Encrypted
+        smtp_secure INTEGER DEFAULT 1,
+        gmail_user TEXT,
+        gmail_app_password TEXT, -- Encrypted
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    exec("INSERT OR IGNORE INTO email_settings (id, provider) VALUES (1, 'gmail')");
+    console.log('[MIGRATION] Created email_settings table');
+  }
+
+  if (!tableExists('otp_tokens')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS otp_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL, -- 'email' or 'phone'
+        otp_hash TEXT,
+        token_hash TEXT,
+        expires_at DATETIME NOT NULL,
+        is_used INTEGER DEFAULT 0,
+        is_opened INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+    exec("CREATE INDEX IF NOT EXISTS idx_otp_token_hash ON otp_tokens(token_hash)");
+    console.log('[MIGRATION] Created otp_tokens table');
+  }
+
+  if (!tableExists('auth_audit_logs')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS auth_audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        action TEXT NOT NULL,
+        masked_identifier TEXT, -- Masked email or phone
+        ip_address TEXT,
+        status TEXT, -- 'success', 'failed'
+        details TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[MIGRATION] Created auth_audit_logs table');
+  }
+
+  if (!tableExists('ad_config_snapshots')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS ad_config_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        snapshot_data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[MIGRATION] Created ad_config_snapshots table');
+  }
+
+  // Phase 55: Project Brain Tables
+  if (!tableExists('project_phases')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS project_phases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phase_number INTEGER UNIQUE NOT NULL,
+        phase_name TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        completion_percent INTEGER DEFAULT 0,
+        risk_level TEXT DEFAULT 'LOW',
+        summary TEXT,
+        report_path TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[MIGRATION] Created project_phases table');
+
+    // Seed existing phases
+    const phases = [
+      [53, 'Internal Phone Lookup + Governance', 'completed', 100, 'LOW', 'Internal lookup system to replace external redirects.'],
+      [54, 'Advanced Auth + Self-hosted OTP', 'completed', 100, 'LOW', 'Email/Phone verification without third-party services.'],
+      [55, 'Project Brain + Production Hardening', 'completed', 100, 'LOW', 'System monitoring, risk detection and roadmap governance.'],
+      [56, 'Production QA + Release Gate', 'in_progress', 10, 'LOW', 'Verification, bug fixing, and release readiness.']
+    ];
+    phases.forEach(([num, name, status, pct, risk, sum]) => {
+      run("INSERT INTO project_phases (phase_number, phase_name, status, completion_percent, risk_level, summary) VALUES (?, ?, ?, ?, ?, ?)", num, name, status, pct, risk, sum);
+    });
+  }
+
+  // Phase 56: Production QA + Release Gate
+  if (tableExists('project_phases')) {
+    run("UPDATE project_phases SET status = 'completed', completion_percent = 100 WHERE phase_number = 56");
+  }
+
+  // Phase 57: Offline Message Queue + Unread Counter + In-App Notification Center
+  if (tableExists('project_phases')) {
+    const p57 = get("SELECT * FROM project_phases WHERE phase_number = 57");
+    if (!p57) {
+      run("INSERT INTO project_phases (phase_number, phase_name, status, completion_percent, risk_level, summary) VALUES (57, 'Offline Queue + Notifications', 'completed', 100, 'LOW', 'Self-hosted messaging reliability, unread counts, and notification center.')");
+    } else {
+      run("UPDATE project_phases SET status = 'completed', completion_percent = 100 WHERE phase_number = 57");
+    }
+    
+    const p58 = get("SELECT * FROM project_phases WHERE phase_number = 58");
+    if (!p58) {
+      run("INSERT INTO project_phases (phase_number, phase_name, status, completion_percent, risk_level, summary) VALUES (58, 'P2P Local Media Transfer', 'in_progress', 0, 'LOW', 'WebRTC DataChannel media transfer with local-only storage policy.')");
+    }
+  }
+
+  // Extend messages table for Phase 57 (preserved)
+  if (tableExists('messages')) {
+    if (!columnExists('messages', 'conversation_id')) {
+      exec("ALTER TABLE messages ADD COLUMN conversation_id TEXT");
+      exec("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)");
+    }
+    if (!columnExists('messages', 'message_text')) {
+      exec("ALTER TABLE messages ADD COLUMN message_text TEXT");
+    }
+    if (!columnExists('messages', 'delivery_status')) {
+      exec("ALTER TABLE messages ADD COLUMN delivery_status TEXT DEFAULT 'sent'");
+    }
+    if (!columnExists('messages', 'client_message_id')) {
+      exec("ALTER TABLE messages ADD COLUMN client_message_id TEXT");
+      exec("CREATE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id)");
+    }
+    if (!columnExists('messages', 'created_at')) {
+      exec("ALTER TABLE messages ADD COLUMN created_at DATETIME");
+    }
+    if (!columnExists('messages', 'delivered_at')) {
+      exec("ALTER TABLE messages ADD COLUMN delivered_at DATETIME");
+    }
+    if (!columnExists('messages', 'read_at')) {
+      exec("ALTER TABLE messages ADD COLUMN read_at DATETIME");
+    }
+  }
+
+  // Create conversation_states table (Phase 57)
+  if (!tableExists('conversation_states')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS conversation_states (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        last_read_message_id INTEGER,
+        unread_count INTEGER DEFAULT 0,
+        muted INTEGER DEFAULT 0,
+        archived INTEGER DEFAULT 0,
+        pinned INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(conversation_id, user_id)
+      )
+    `);
+    exec("CREATE INDEX IF NOT EXISTS idx_conv_state_user ON conversation_states(user_id)");
+  }
+
+  // Create in_app_notifications table (Phase 57)
+  if (!tableExists('in_app_notifications')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS in_app_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        related_user_id INTEGER,
+        related_conversation_id TEXT,
+        is_read INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    exec("CREATE INDEX IF NOT EXISTS idx_notifications_user ON in_app_notifications(user_id)");
+  }
+
+  // Phase 58: Media Messages (Index only, no files on server)
+  if (!tableExists('media_messages')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS media_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL,
+        conversation_id TEXT NOT NULL,
+        sender_id INTEGER NOT NULL,
+        receiver_id INTEGER NOT NULL,
+        media_type TEXT NOT NULL, -- image, video, voice, file
+        file_id TEXT UNIQUE NOT NULL,
+        file_name TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        mime_type TEXT NOT NULL,
+        local_sender_path_hash TEXT,
+        receiver_local_path_hash TEXT,
+        transfer_status TEXT DEFAULT 'pending', -- pending, transferring, completed, failed, expired
+        data_channel_session_id TEXT,
+        checksum TEXT,
+        thumbnail_metadata_json TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        expires_at DATETIME,
+        FOREIGN KEY (message_id) REFERENCES messages(id)
+      )
+    `);
+    exec("CREATE INDEX IF NOT EXISTS idx_media_conv ON media_messages(conversation_id)");
+    exec("CREATE INDEX IF NOT EXISTS idx_media_file_id ON media_messages(file_id)");
+    console.log('[MIGRATION] Created media_messages table');
+  }
+
+  // Phase 58: Media Transfer Sessions
+  if (!tableExists('media_transfer_sessions')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS media_transfer_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT UNIQUE NOT NULL,
+        message_id INTEGER NOT NULL,
+        sender_id INTEGER NOT NULL,
+        receiver_id INTEGER NOT NULL,
+        status TEXT DEFAULT 'offered', -- offered, accepted, transferring, completed, failed
+        chunk_size INTEGER DEFAULT 16384,
+        total_chunks INTEGER DEFAULT 0,
+        transferred_chunks INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (message_id) REFERENCES messages(id)
+      )
+    `);
+    console.log('[MIGRATION] Created media_transfer_sessions table');
+  }
+
+  // Phase 59: Coturn TURN Relay + Dynamic Connectivity Control
+  if (tableExists('project_phases')) {
+    run("UPDATE project_phases SET status = 'completed', completion_percent = 100 WHERE phase_number = 58");
+    
+    const p59 = get("SELECT * FROM project_phases WHERE phase_number = 59");
+    if (!p59) {
+      run("INSERT INTO project_phases (phase_number, phase_name, status, completion_percent, risk_level, summary) VALUES (59, 'Coturn TURN + Dynamic Connectivity', 'in_progress', 0, 'LOW', 'Self-hosted STUN/TURN fallback and region-based connectivity policies.')");
+    }
+  }
+
+  // Phase 60: Production Observability + Real Coturn Validation + Cost Guard
+  if (tableExists('project_phases')) {
+    run("UPDATE project_phases SET status = 'completed', completion_percent = 100 WHERE phase_number = 59");
+    
+    const p60 = get("SELECT * FROM project_phases WHERE phase_number = 60");
+    if (!p60) {
+      run("INSERT INTO project_phases (phase_number, phase_name, status, completion_percent, risk_level, summary) VALUES (60, 'Production Observability + Cost Guard', 'in_progress', 0, 'LOW', 'Real TURN health checks, usage tracking, and bandwidth cost guard.')");
+    }
+  }
+
+  if (!tableExists('turn_health_checks')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS turn_health_checks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        turn_server_id INTEGER NOT NULL,
+        status TEXT NOT NULL, -- ok, warning, failed
+        udp_reachable INTEGER DEFAULT 0,
+        tcp_reachable INTEGER DEFAULT 0,
+        tls_reachable INTEGER DEFAULT 0,
+        latency_ms INTEGER,
+        error_message TEXT,
+        checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (turn_server_id) REFERENCES turn_servers(id)
+      )
+    `);
+    console.log('[MIGRATION] Created turn_health_checks table');
+  }
+
+  if (!tableExists('relay_usage_stats')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS relay_usage_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        country_iso TEXT,
+        connection_type TEXT, -- call, media
+        relay_mode TEXT, -- direct, turn_udp, turn_tcp, turn_tls
+        bytes_estimated INTEGER DEFAULT 0,
+        duration_seconds INTEGER DEFAULT 0,
+        session_id TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[MIGRATION] Created relay_usage_stats table');
+  }
+
+  if (!tableExists('relay_cost_guard_rules')) {
+    exec(`
+      CREATE TABLE IF NOT EXISTS relay_cost_guard_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rule_name TEXT NOT NULL,
+        country_iso TEXT, -- NULL for global
+        max_relay_minutes_per_user_daily INTEGER DEFAULT 60,
+        max_media_mb_per_user_daily INTEGER DEFAULT 500,
+        force_turn_allowed INTEGER DEFAULT 1,
+        alert_threshold_percent INTEGER DEFAULT 80,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[MIGRATION] Created relay_cost_guard_rules table');
+    
+    // Seed global rule
+    run("INSERT INTO relay_cost_guard_rules (rule_name, country_iso) VALUES ('Global Default Guard', NULL)");
   }
 
   console.log('[MIGRATION] Database migrations complete');

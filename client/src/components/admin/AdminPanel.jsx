@@ -4,6 +4,13 @@ import QAGate from './QAGate.jsx';
 import ProjectBrainDashboard from './ProjectBrainDashboard.jsx';
 import AdControlCenter from './AdControlCenter.jsx';
 import MonetizationHealthCard from './MonetizationHealthCard.jsx';
+import EmailSettingsManager from './EmailSettingsManager.jsx';
+import VerificationLinkTester from './VerificationLinkTester.jsx';
+import TurnServerManager from '../connectivity/TurnServerManager.jsx';
+import ConnectivityPolicyPanel from '../connectivity/ConnectivityPolicyPanel.jsx';
+import TurnLiveHealthPanel from '../connectivity/TurnLiveHealthPanel.jsx';
+import RelayUsageTable from '../connectivity/RelayUsageTable.jsx';
+import CostGuardPanel from '../connectivity/CostGuardPanel.jsx';
 import { API_URL } from '../../config/api.js';
 import './AdminPanel.css';
 
@@ -23,6 +30,8 @@ function AdminPanel({ admin, onLogout }) {
     if (path.includes('/qa')) return 'qa';
     if (path.includes('/project-brain')) return 'project-brain';
     if (path.includes('/ads')) return 'ads';
+    if (path.includes('/communication')) return 'communication';
+    if (path.includes('/connectivity')) return 'connectivity';
     return 'dashboard';
   };
 
@@ -412,7 +421,9 @@ function AdminPanel({ admin, onLogout }) {
       reports: '/exclusivesecure/reports',
       qa: '/exclusivesecure/qa',
       'project-brain': '/exclusivesecure/project-brain',
-      ads: '/exclusivesecure/ads'
+      ads: '/exclusivesecure/ads',
+      communication: '/exclusivesecure/communication',
+      connectivity: '/exclusivesecure/connectivity'
     };
     navigate(routes[tab]);
   };
@@ -482,6 +493,14 @@ function AdminPanel({ admin, onLogout }) {
           <div className={`admin-nav-item ${activeTab === 'ads' ? 'active' : ''}`} onClick={() => navigateTo('ads')}>
             <span>💰</span>
             <span>Ad Control</span>
+          </div>
+          <div className={`admin-nav-item ${activeTab === 'communication' ? 'active' : ''}`} onClick={() => navigateTo('communication')}>
+            <span>📧</span>
+            <span>Communication</span>
+          </div>
+          <div className={`admin-nav-item ${activeTab === 'connectivity' ? 'active' : ''}`} onClick={() => navigateTo('connectivity')}>
+            <span>🔌</span>
+            <span>Connectivity</span>
           </div>
           <div className="admin-nav-item" onClick={onLogout}>
             <span>🚪</span>
@@ -558,6 +577,28 @@ function AdminPanel({ admin, onLogout }) {
         )}
 
         {activeTab === 'ads' && <AdControlCenter admin={admin} />}
+
+        {activeTab === 'connectivity' && (
+          <div className="space-y-6 p-4">
+            <div className="admin-header">
+              <h1>Connectivity & Observability</h1>
+              <p>Real-time WebRTC Infrastructure Monitoring</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <TurnLiveHealthPanel />
+              <TurnServerManager />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <RelayUsageTable />
+              </div>
+              <div className="space-y-6">
+                <CostGuardPanel />
+                <ConnectivityPolicyPanel />
+              </div>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'users' && (
           <div className="user-management">
@@ -746,6 +787,25 @@ function AdminPanel({ admin, onLogout }) {
             )}
           </div>
         )}
+
+        {activeTab === 'communication' && (
+          <div className="communication-container">
+            <div className="admin-header">
+              <h1>Communication Governance</h1>
+              <p>Self-hosted verification & Email gateway controls</p>
+            </div>
+            <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+              <div className="settings-section">
+                <EmailSettingsManager authHeader={getAuthHeader()} API_URL={API_URL} />
+              </div>
+              <div className="settings-section">
+                <VerificationLinkTester authHeader={getAuthHeader()} API_URL={API_URL} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'project-brain' && <ProjectBrainDashboard admin={admin} />}
 
         {activeTab === 'structure-lock' && (
           <div className="structure-lock-container">

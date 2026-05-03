@@ -186,6 +186,21 @@ export const projectBrainData = {
         description: "Peer-to-peer media streaming implemented"
       },
       {
+        feature: "P2P Media Transfer",
+        status: "completed",
+        description: "Server-less media sharing via DataChannels"
+      },
+      {
+        feature: "Coturn TURN Relay",
+        status: "completed",
+        description: "Self-hosted fallback for WebRTC connectivity"
+      },
+      {
+        feature: "Production Observability",
+        status: "in-progress",
+        description: "Real TURN health, usage tracking, and cost guard"
+      },
+      {
         feature: "User Authentication",
         status: "completed",
         description: "Login/logout and admin access control"
@@ -606,7 +621,11 @@ export const projectBrainData = {
           "Real-time safety monitoring display",
           "Component registry documentation",
           "Design token inspector",
-          "Responsive safety guidelines"
+          "Responsive safety guidelines",
+          "P2P Media Transfer (Phase 58)",
+          "Coturn TURN Relay Fallback (Phase 59)",
+          "Dynamic Connectivity Policies (Phase 59)",
+          "Production Observability & Cost Guard (Phase 60)"
         ]
       },
       {

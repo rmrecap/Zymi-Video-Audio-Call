@@ -22,12 +22,12 @@ export const sanitizeFilename = (filename) => {
   return base.replace(/[^a-zA-Z0-9.-]/g, '_');
 };
 
-export const validateAvatar = (buffer, mimetype) => {
+export const validateAvatar = (buffer, mimetype, originalFilename) => {
   if (buffer.length > MAX_FILE_SIZE) {
     return { valid: false, error: 'File too large (max 2MB)' };
   }
 
-  const ext = path.extname(mimetype?.toLowerCase() || '');
+  const ext = path.extname(originalFilename || '').toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
     return { valid: false, error: 'Invalid file type. Allowed: jpg, png, webp' };
   }
@@ -39,7 +39,13 @@ export const saveAvatar = (userId, buffer, originalFilename) => {
   ensureDir();
 
   const sanitized = sanitizeFilename(originalFilename);
-  const ext = path.extname(sanitized);
+  let ext = path.extname(sanitized).toLowerCase();
+  
+  // Extra safety: Fallback to .jpg if extension is missing or not allowed
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    ext = '.jpg';
+  }
+  
   const filename = `avatar_${userId}_${Date.now()}${ext}`;
   const filepath = path.join(AVATAR_UPLOAD_DIR, filename);
 

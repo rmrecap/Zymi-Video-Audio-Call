@@ -1,11 +1,84 @@
 import { all, get, run } from '../db/database.js';
 
 export const adConfigService = {
+  createSnapshot: () => {
+    const global = get('SELECT * FROM ad_global_settings WHERE id = 1');
+    const networks = all('SELECT * FROM ad_network_configs');
+    const placements = all('SELECT * FROM ad_placements');
+    const countryRules = all('SELECT * FROM ad_country_rules');
+    const versionRules = all('SELECT * FROM ad_version_rules');
+    
+    const snapshotData = JSON.stringify({
+      global, networks, placements, countryRules, versionRules
+    });
+    
+    run('INSERT INTO ad_config_snapshots (snapshot_data) VALUES (?)', snapshotData);
+  },
+
+  rollbackToLastSnapshot: (adminId) => {
+    const snapshot = get('SELECT * FROM ad_config_snapshots ORDER BY id DESC LIMIT 1');
+    if (!snapshot) return { success: false, message: 'No snapshot available' };
+    
+    const data = JSON.parse(snapshot.snapshot_data);
+    
+    run('BEGIN TRANSACTION');
+    try {
+      if (data.global) {
+        run(`
+          UPDATE ad_global_settings SET 
+            ads_enabled = ?, test_mode = ?, active_network = ?, fallback_network = ?, interstitial_gap_seconds = ?, native_refresh_seconds = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = 1
+        `, data.global.ads_enabled, data.global.test_mode, data.global.active_network, data.global.fallback_network, data.global.interstitial_gap_seconds, data.global.native_refresh_seconds);
+      }
+      if (data.networks) {
+        for (const net of data.networks) {
+          run(`
+            UPDATE ad_network_configs SET 
+              sdk_key = ?, app_id = ?, interstitial_id = ?, native_id = ?, rewarded_id = ?, banner_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE network_key = ?
+          `, net.sdk_key, net.app_id, net.interstitial_id, net.native_id, net.rewarded_id, net.banner_id, net.is_active, net.network_key);
+        }
+      }
+      if (data.placements) {
+        for (const p of data.placements) {
+          run(`
+            UPDATE ad_placements SET 
+              enabled = ?, min_delay_seconds = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE placement_key = ?
+          `, p.enabled, p.min_delay_seconds, p.placement_key);
+        }
+      }
+      
+      run('DELETE FROM ad_country_rules');
+      if (data.countryRules) {
+        for (const r of data.countryRules) {
+          run(`INSERT INTO ad_country_rules (country_code, ads_enabled, network_override) VALUES (?, ?, ?)`, r.country_code, r.ads_enabled, r.network_override);
+        }
+      }
+      
+      run('DELETE FROM ad_version_rules');
+      if (data.versionRules) {
+        for (const r of data.versionRules) {
+          run(`INSERT INTO ad_version_rules (app_version, ads_enabled, force_update) VALUES (?, ?, ?)`, r.app_version, r.ads_enabled, r.force_update);
+        }
+      }
+      
+      run('COMMIT');
+      adConfigService.logAudit(adminId, 'AD_CONFIG_ROLLBACK', null, null, 'ALL', 'HIGH');
+      return { success: true };
+    } catch (err) {
+      run('ROLLBACK');
+      console.error('[ZRCS] Rollback failed:', err);
+      return { success: false, message: err.message };
+    }
+  },
+
   getGlobalSettings: () => {
     return get('SELECT * FROM ad_global_settings WHERE id = 1');
   },
 
   updateGlobalSettings: (settings, adminId) => {
+    adConfigService.createSnapshot();
     const old = adConfigService.getGlobalSettings();
     const { ads_enabled, test_mode, active_network, fallback_network, interstitial_gap_seconds, native_refresh_seconds } = settings;
     
@@ -36,6 +109,7 @@ export const adConfigService = {
   },
 
   updateNetworkConfig: (config, adminId) => {
+    adConfigService.createSnapshot();
     const old = get('SELECT * FROM ad_network_configs WHERE network_key = ?', config.network_key);
     const { network_key, sdk_key, app_id, interstitial_id, native_id, rewarded_id, banner_id, is_active } = config;
     
@@ -65,6 +139,7 @@ export const adConfigService = {
   },
 
   updatePlacement: (placement, adminId) => {
+    adConfigService.createSnapshot();
     const old = get('SELECT * FROM ad_placements WHERE placement_key = ?', placement.placement_key);
     const { placement_key, enabled, min_delay_seconds } = placement;
     
@@ -85,6 +160,7 @@ export const adConfigService = {
   },
 
   addCountryRule: (rule, adminId) => {
+    adConfigService.createSnapshot();
     const { country_code, ads_enabled, network_override } = rule;
     run(`
       INSERT INTO ad_country_rules (country_code, ads_enabled, network_override)
@@ -96,6 +172,7 @@ export const adConfigService = {
   },
 
   removeCountryRule: (id, adminId) => {
+    adConfigService.createSnapshot();
     const old = get('SELECT * FROM ad_country_rules WHERE id = ?', id);
     run('DELETE FROM ad_country_rules WHERE id = ?', id);
     adConfigService.logAudit(adminId, 'REMOVE_COUNTRY_RULE', JSON.stringify(old), null, 'GEO_RULES', 'HIGH');
@@ -107,6 +184,7 @@ export const adConfigService = {
   },
 
   addVersionRule: (rule, adminId) => {
+    adConfigService.createSnapshot();
     const { app_version, ads_enabled, force_update } = rule;
     run(`
       INSERT INTO ad_version_rules (app_version, ads_enabled, force_update)
@@ -118,6 +196,7 @@ export const adConfigService = {
   },
 
   removeVersionRule: (id, adminId) => {
+    adConfigService.createSnapshot();
     const old = get('SELECT * FROM ad_version_rules WHERE id = ?', id);
     run('DELETE FROM ad_version_rules WHERE id = ?', id);
     adConfigService.logAudit(adminId, 'REMOVE_VERSION_RULE', JSON.stringify(old), null, 'VERSION_RULES', 'HIGH');
@@ -189,6 +268,17 @@ export const adConfigService = {
       },
       placements: placementObj,
       networks: networkObj
+    };
+  },
+
+  exportConfig: () => {
+    return {
+      global: adConfigService.getGlobalSettings(),
+      networks: adConfigService.getNetworkConfigs(),
+      placements: adConfigService.getPlacements(),
+      countryRules: adConfigService.getCountryRules(),
+      versionRules: adConfigService.getVersionRules(),
+      latestAuditLogs: get('SELECT * FROM ad_config_audit_logs ORDER BY timestamp DESC LIMIT 50')
     };
   }
 };
