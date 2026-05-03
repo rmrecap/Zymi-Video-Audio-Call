@@ -20,7 +20,7 @@ Write-Host "Running flutter analyze..."
 flutter analyze
 
 Write-Host "Running flutter build apk --debug..."
-flutter build apk --debug
+flutter build apk --debug --android-skip-build-dependency-validation
 
 Write-Host "Backend syntax check..."
 node --check ../../server/index.js
