@@ -47,6 +47,8 @@ export const setupChatSocket = (io, userSockets) => {
         socket.tokenVersion = user?.token_version || 1;
         socket.onlineVisibility = user?.online_visibility !== false; // default true
 
+        // Phase 63: Multi-tab support - join room and set map
+        socket.join(normalizedUserId);
         userSockets.set(normalizedUserId, socket.id);
 
         // Phase 57: Sync pending messages when user joins
@@ -317,29 +319,39 @@ export const setupChatSocket = (io, userSockets) => {
       }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       try {
         if (socket.userId) {
-          userSockets.delete(socket.userId);
+          const userId = socket.userId;
+          
+          // Phase 63: Check if user has other active connections before marking offline
+          const remainingSockets = await io.in(userId).fetchSockets();
+          
+          if (remainingSockets.length === 0) {
+            userSockets.delete(userId);
 
-          // Clean up any active call for this user
-          cleanupUserActiveCall(socket.userId, io, userSockets);
+            // Clean up any active call for this user
+            cleanupUserActiveCall(userId, io, userSockets);
 
-          // Shadow delete from Redis registry (dev-only)
-          if (process.env.REDIS_SOCKET_REGISTRY_SHADOW === 'true' && process.env.NODE_ENV !== 'production') {
-            try {
-              const registry = getUserSocketRegistry();
-              registry.deleteUserSocket(socket.userId);
-            } catch (error) {
-              console.error('[DISCONNECT] Shadow delete failed:', error.message);
+            // Shadow delete from Redis registry (dev-only)
+            if (process.env.REDIS_SOCKET_REGISTRY_SHADOW === 'true' && process.env.NODE_ENV !== 'production') {
+              try {
+                const registry = getUserSocketRegistry();
+                registry.deleteUserSocket(userId);
+              } catch (error) {
+                console.error('[DISCONNECT] Shadow delete failed:', error.message);
+              }
             }
-          }
 
-          // Only broadcast offline if user was visible to others
-          if (socket.onlineVisibility !== false) {
-            socket.broadcast.emit(SOCKET_EVENTS.USER_OFFLINE, { userId: String(socket.userId) });
+            // Only broadcast offline if user was visible to others
+            if (socket.onlineVisibility !== false) {
+              socket.broadcast.emit(SOCKET_EVENTS.USER_OFFLINE, { userId: String(userId) });
+            }
+            incrementDisconnects();
+          } else {
+            // Update mapping to another active socket for this user
+            userSockets.set(userId, remainingSockets[0].id);
           }
-          incrementDisconnects();
         }
         console.log('[SOCKET] User disconnected:', socket.id);
       } catch (err) {
