@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSocket, useConnectionStatus } from '../socket/SocketContext.jsx';
+import { useCrossTabSync } from '../hooks/useCrossTabSync.js';
 import CallTimeoutNotice from './calls/CallTimeoutNotice.jsx';
 import CallOverlay from './CallOverlay.jsx';
 import PremiumCallOverlay from './chat/PremiumCallOverlay.jsx';
@@ -44,7 +45,7 @@ function Dashboard({ user, onLogout }) {
   const [callError, setCallError] = useState('');
   const [callTimeout, setCallTimeout] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
-  const [onlineUsers, setOnlineUsers] = useState({});
+  const [onlineUsers, setOnlineUsers] = useCrossTabSync('onlineUsers', {});
   const [unreadCounts, setUnreadCounts] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
