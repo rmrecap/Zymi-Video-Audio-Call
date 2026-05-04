@@ -1,5 +1,5 @@
 # Run Flutter on Device from D Drive
-$env:GRADLE_USER_HOME = "D:\gradle-cache"
+$env:GRADLE_USER_HOME = "D:\G"
 $env:TEMP = "D:\android-temp"
 $env:TMP = "D:\android-temp"
 
