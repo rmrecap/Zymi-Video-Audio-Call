@@ -2,23 +2,25 @@ import { checkBlocked, blockUser, unblockUser, getBlockedUsers } from '../servic
 
 export const block = (req, res) => {
   const blockerId = req.user.id;
-  const { targetUserId } = req.body;
+  const targetUserId = req.body.targetUserId || req.params.userId;
 
   if (!targetUserId) {
     return res.status(400).json({ error: 'Target user ID required' });
   }
 
-  if (blockerId === parseInt(targetUserId)) {
+  const tid = parseInt(targetUserId);
+
+  if (blockerId === tid) {
     return res.status(400).json({ error: 'Cannot block yourself' });
   }
 
-  blockUser(blockerId, parseInt(targetUserId));
+  blockUser(blockerId, tid);
   res.json({ success: true, message: 'User blocked' });
 };
 
 export const unblock = (req, res) => {
   const blockerId = req.user.id;
-  const { targetUserId } = req.body;
+  const targetUserId = req.body.targetUserId || req.params.userId;
 
   if (!targetUserId) {
     return res.status(400).json({ error: 'Target user ID required' });

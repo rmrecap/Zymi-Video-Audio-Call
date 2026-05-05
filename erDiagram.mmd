@@ -1,0 +1,156 @@
+erDiagram
+    users {
+        UUID id PK
+        VARCHAR username UK
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR phone_normalized UK
+        BOOLEAN email_verified
+        VARCHAR role
+        VARCHAR status
+        geometry location "PostGIS Point"
+        TIMESTAMPTZ last_location_update
+        TIMESTAMPTZ created_at
+    }
+
+    otp_tokens {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR token_hash
+        VARCHAR type
+        TIMESTAMPTZ expires_at
+        BOOLEAN used
+    }
+
+    groups {
+        UUID id PK
+        VARCHAR name
+        TEXT description
+        UUID created_by FK
+        TIMESTAMPTZ created_at
+    }
+
+    %% Junction Table (Many-to-Many: Users <-> Groups)
+    group_members {
+        UUID group_id PK, FK
+        UUID user_id PK, FK
+        VARCHAR role
+        TIMESTAMPTZ joined_at
+    }
+
+    messages {
+        UUID id PK
+        UUID sender_id FK
+        UUID recipient_id FK "Nullable"
+        UUID group_id FK "Nullable"
+        TEXT body
+        VARCHAR message_type
+        VARCHAR status
+        TIMESTAMPTZ created_at
+    }
+
+    call_history {
+        UUID id PK
+        UUID caller_id FK
+        UUID callee_id FK "Nullable"
+        UUID group_id FK "Nullable"
+        VARCHAR call_type
+        VARCHAR status
+        INTEGER duration_seconds
+        TIMESTAMPTZ started_at
+    }
+
+    user_points {
+        UUID id PK
+        UUID user_id FK
+        INTEGER points
+        VARCHAR source
+    }
+
+    badges {
+        UUID id PK
+        VARCHAR name
+        TEXT description
+        VARCHAR rule_key UK
+    }
+
+    %% Junction Table (Many-to-Many: Users <-> Badges)
+    user_badges {
+        UUID user_id PK, FK
+        UUID badge_id PK, FK
+        TIMESTAMPTZ awarded_at
+    }
+
+    %% Junction Table (Many-to-Many: Users <-> Users)
+    blocked_users {
+        UUID blocker_id PK, FK
+        UUID blocked_id PK, FK
+        TIMESTAMPTZ created_at
+    }
+
+    message_reports {
+        UUID id PK
+        UUID reporter_id FK
+        UUID message_id FK
+        VARCHAR reason
+        VARCHAR status
+    }
+
+    auth_audit_logs {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR action
+        VARCHAR ip_masked
+        TIMESTAMPTZ created_at
+    }
+
+    admin_audit_logs {
+        UUID id PK
+        UUID admin_id FK
+        VARCHAR action_type
+        UUID target_user_id FK "Nullable"
+        JSONB payload
+        TIMESTAMPTZ created_at
+    }
+
+    ad_global_settings {
+        INTEGER id PK
+        BOOLEAN ads_enabled
+        BOOLEAN test_mode
+        VARCHAR active_network
+        VARCHAR fallback_network
+    }
+
+    %% ==========================================
+    %% RELATIONSHIPS
+    %% ==========================================
+
+    %% User 1-to-Many Ownerships
+    users ||--o{ otp_tokens : "has"
+    users ||--o{ groups : "creates"
+    users ||--o{ messages : "sends"
+    users ||--o{ messages : "receives (1-on-1)"
+    users ||--o{ call_history : "initiates call"
+    users ||--o{ call_history : "receives call (1-on-1)"
+    users ||--o{ user_points : "earns"
+    users ||--o{ auth_audit_logs : "generates log"
+    users ||--o{ message_reports : "submits report"
+    users ||--o{ admin_audit_logs : "performs (if admin)"
+    users ||--o{ admin_audit_logs : "targeted by"
+
+    %% Group 1-to-Many Ownerships
+    groups ||--o{ messages : "contains"
+    groups ||--o{ call_history : "hosts group call"
+
+    %% Many-to-Many Mappings (via Junction Tables)
+    users ||--o{ group_members : "joins"
+    groups ||--o{ group_members : "includes"
+    
+    users ||--o{ user_badges : "awarded"
+    badges ||--o{ user_badges : "belongs to"
+
+    users ||--o{ blocked_users : "blocks"
+    users ||--o{ blocked_users : "is blocked by"
+
+    %% Inter-entity mappings
+    messages ||--o{ message_reports : "is reported in"

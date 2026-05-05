@@ -50,7 +50,7 @@ import { isBlocked } from './src/routes/blockRoutes.js';
 import { register, login, adminLogin } from './src/routes/authRoutes.js';
 import { getUsers, getMessages, searchMessages, getUnread, markAsRead } from './src/routes/messageRoutes.js';
 import { editMessage, getMessageEdits } from './src/routes/messageEditRoutes.js';
-import { getProfile, updateProfile, getUserSettings, updateUserSettings, changePassword as changeUserPassword } from './src/routes/profileRoutes.js';
+import { getProfile, updateProfile, getMyProfile, updateMyProfile, getUserSettings, updateUserSettings, changePassword as changeUserPassword } from './src/routes/profileRoutes.js';
 import {
   getStats, getUsers as getAdminUsers, banUser, unbanUser,
   getAudit, getRisks, getPermissions, updateUserRole, changePassword as changeAdminPassword, exportData,
@@ -58,7 +58,7 @@ import {
 } from './src/routes/adminRoutes.js';
 import { requireAuth, requireAdmin } from './src/middleware/authMiddleware.js';
 import { block, unblock, checkBlock, listBlocked } from './src/routes/blockRoutes.js';
-import { reportMessage, getAllReports, resolveMessageReport } from './src/routes/reportRoutes.js';
+import { reportMessage, reportUser, getAllReports, resolveMessageReport } from './src/routes/reportRoutes.js';
 import { getUserCallHistory } from './src/routes/callHistoryRoutes.js';
 import { uploadAvatar, getAvatar, deleteUserAvatar, uploadMessageFile, getMessageFile } from './src/routes/uploadRoutes.js';
 import adminFeatureRoutes from './src/routes/adminFeatureRoutes.js';
@@ -154,8 +154,14 @@ app.post('/api/messages/read', requireAuth, markAsRead);
 app.put('/api/messages/:messageId/edit', requireAuth, editMessage);
 app.get('/api/messages/:messageId/edits', requireAuth, getMessageEdits);
 
+app.get('/api/profile/me', requireAuth, getMyProfile);
+app.patch('/api/profile/me', requireAuth, updateMyProfile);
 app.get('/api/profile/:userId', requireAuth, getProfile);
 app.put('/api/profile/:userId', requireAuth, updateProfile);
+app.get('/api/settings/me', requireAuth, (req, res) => {
+  req.params.userId = req.user.id;
+  getUserSettings(req, res);
+});
 app.get('/api/settings/:userId', requireAuth, getUserSettings);
 app.put('/api/settings/:userId', requireAuth, updateUserSettings);
 app.post('/api/profile/:userId/password', requireAuth, changeUserPassword);
@@ -166,6 +172,7 @@ app.get('/api/block/:userId', requireAuth, listBlocked);
 app.get('/api/block/:userId/:targetId', requireAuth, checkBlock);
 
 app.post('/api/report', requireAuth, reportMessage);
+app.post('/api/report/:userId', requireAuth, reportUser);
 app.get('/api/calls/:userId', requireAuth, getUserCallHistory);
 
 app.post('/api/upload/avatar', requireAuth, uploadAvatar);

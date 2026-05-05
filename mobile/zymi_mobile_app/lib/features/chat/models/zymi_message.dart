@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ZymiMessage {
   final int? id;
   final String? tempId;
@@ -42,6 +44,17 @@ class ZymiMessage {
   }
 
   factory ZymiMessage.fromJson(Map<String, dynamic> json, String currentUserId) {
+    Map<String, dynamic>? parsedMetadata;
+    if (json['metadata'] != null) {
+      if (json['metadata'] is Map) {
+        parsedMetadata = Map<String, dynamic>.from(json['metadata']);
+      } else if (json['metadata'] is String) {
+        try {
+          parsedMetadata = Map<String, dynamic>.from(jsonDecode(json['metadata']));
+        } catch (_) {}
+      }
+    }
+
     return ZymiMessage(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
       tempId: json['tempId']?.toString() ?? json['client_message_id']?.toString(),
@@ -52,8 +65,8 @@ class ZymiMessage {
       status: json['delivery_status']?.toString() ?? json['status']?.toString() ?? 'sent',
       createdAt: DateTime.tryParse(json['timestamp']?.toString() ?? json['created_at']?.toString() ?? '') ?? DateTime.now(),
       isMine: json['sender_id']?.toString() == currentUserId,
-      metadata: json['metadata'] as Map<String, dynamic>?,
-      mediaMetadata: json['media_metadata'] as Map<String, dynamic>?,
+      metadata: parsedMetadata,
+      mediaMetadata: json['media_metadata'] is Map ? Map<String, dynamic>.from(json['media_metadata']) : null,
     );
   }
 
@@ -67,6 +80,7 @@ class ZymiMessage {
       'message_type': type,
       'status': status,
       'timestamp': createdAt.toIso8601String(),
+      'metadata': metadata,
       'media_metadata': mediaMetadata,
     };
   }

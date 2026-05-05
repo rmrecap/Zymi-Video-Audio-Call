@@ -11,6 +11,9 @@ import '../../features/verification/screens/profile_verification_screen.dart';
 import '../../features/verification/screens/email_otp_screen.dart';
 import '../../features/verification/screens/phone_otp_screen.dart';
 import '../../features/notifications/screens/notification_center_screen.dart';
+import '../../features/profile/screens/profile_screen.dart';
+import '../../features/call/call_preflight_screen.dart';
+import '../../features/profile/screens/contact_detail_screen.dart';
 
 class ZymiRoutes {
   static const String home = '/home';
@@ -27,6 +30,9 @@ class ZymiRoutes {
   static const String emailOtp = '/email_otp';
   static const String phoneOtp = '/phone_otp';
   static const String notifications = '/notifications';
+  static const String profile = '/profile';
+  static const String contactDetail = '/contact_detail';
+  static const String callPreflight = '/call_preflight';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -61,6 +67,25 @@ class ZymiRoutes {
         return MaterialPageRoute(builder: (_) => const MobileDiagnosticsScreen());
       case notifications:
         return MaterialPageRoute(builder: (_) => const NotificationCenterScreen());
+      case profile:
+        return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      case contactDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => ContactDetailScreen(
+            userId: args?['userId'] ?? '',
+            username: args?['username'] ?? 'User',
+          ),
+        );
+      case callPreflight:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => CallPreflightScreen(
+            peerId: args?['peerId'] ?? '',
+            peerName: args?['peerName'] ?? 'Unknown',
+            isVideo: args?['isVideo'] ?? false,
+          ),
+        );
       default:
         return MaterialPageRoute(builder: (_) => const ZymiMobileHome());
     }

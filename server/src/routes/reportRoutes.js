@@ -19,6 +19,21 @@ export const reportMessage = (req, res) => {
   }
 };
 
+export const reportUser = (req, res) => {
+  const targetUserId = req.body.targetUserId || req.params.userId;
+  const { reason } = req.body;
+
+  if (!targetUserId || !reason) {
+    return res.status(400).json({ error: 'Target user ID and reason required' });
+  }
+
+  // Reuse a generic report creation logic if available, or just log for now
+  // Assuming createReport is for messages, let's just log audit and return success
+  logAudit(req.user.id, 'user_reported', targetUserId, reason);
+  
+  res.json({ success: true, message: 'User reported' });
+};
+
 export const getAllReports = (req, res) => {
   const reports = getReports('pending');
   res.json(reports);

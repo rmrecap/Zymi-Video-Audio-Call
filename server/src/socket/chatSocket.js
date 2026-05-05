@@ -86,7 +86,7 @@ export const setupChatSocket = (io, userSockets) => {
 
     socket.on(SOCKET_EVENTS.PRIVATE_MESSAGE, async (data) => {
       try {
-        let { to, from, content, tempId, message_type, file_url, file_name, file_size, mime_type, location_lat, location_lng } = data || {};
+        let { to, from, content, tempId, message_type, metadata, file_url, file_name, file_size, mime_type, location_lat, location_lng } = data || {};
 
         // Normalize IDs to string for consistent lookups
         to = String(to);
@@ -119,6 +119,7 @@ export const setupChatSocket = (io, userSockets) => {
           receiver_id: to,
           content: messageContent,
           message_type: message_type || 'text',
+          metadata: metadata,
           client_message_id: tempId,
           conversation_id: conversationId,
           delivery_status: isOnline ? 'sent' : 'queued'
@@ -131,6 +132,7 @@ export const setupChatSocket = (io, userSockets) => {
           content: messageContent,
           message_text: messageContent,
           message_type: message_type || 'text',
+          metadata: metadata,
           file_url,
           file_name,
           file_size,

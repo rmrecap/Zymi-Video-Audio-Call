@@ -28,7 +28,7 @@ class ChatController extends ChangeNotifier {
 
   String get _conversationId {
     if (selectedUserId == null) return '';
-    final ids = [int.parse(currentUserId), int.parse(selectedUserId!)];
+    final ids = [currentUserId, selectedUserId!];
     ids.sort();
     return ids.join('_');
   }
@@ -245,7 +245,7 @@ class ChatController extends ChangeNotifier {
       await MediaIndexService.indexMediaOnServer({
         'message_id': 0, // Will be updated
         'conversation_id': _conversationId,
-        'receiver_id': int.parse(selectedUserId!),
+        'receiver_id': selectedUserId!,
         'media_type': type,
         'file_id': fileId,
         'file_name': fileName,
@@ -347,7 +347,7 @@ class ChatController extends ChangeNotifier {
     _persistCache();
   }
 
-  void sendMessage(String content) {
+  void sendMessage(String content, {String type = 'text', Map<String, dynamic>? metadata}) {
     if (selectedUserId == null || content.isEmpty) return;
 
     final tempId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -356,6 +356,8 @@ class ChatController extends ChangeNotifier {
       senderId: currentUserId,
       receiverId: selectedUserId!,
       content: content,
+      type: type,
+      mediaMetadata: metadata,
       status: 'sending',
       createdAt: DateTime.now(),
       isMine: true,
@@ -369,6 +371,8 @@ class ChatController extends ChangeNotifier {
         from: currentUserId,
         content: content,
         tempId: tempId,
+        messageType: type,
+        metadata: metadata,
       ));
     } else {
       // Queue for later
@@ -377,6 +381,8 @@ class ChatController extends ChangeNotifier {
         'from': currentUserId,
         'content': content,
         'tempId': tempId,
+        'message_type': type,
+        'metadata': metadata,
         'delivery_status': 'queued'
       });
       final idx = messages.indexWhere((m) => m.tempId == tempId);

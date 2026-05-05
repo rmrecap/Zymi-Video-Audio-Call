@@ -60,4 +60,19 @@ class OtpService {
     );
     return jsonDecode(response.body);
   }
+
+  Future<Map<String, dynamic>> verifyPhoneOtpInline(String otp) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('zymi_token');
+    
+    final response = await http.post(
+      Uri.parse('$_baseUrl/phone/verify-inline'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'otp': otp}),
+    );
+    return jsonDecode(response.body);
+  }
 }

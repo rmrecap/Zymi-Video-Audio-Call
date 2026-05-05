@@ -169,6 +169,73 @@ export const getUnread = (req, res) => {
   res.json({ count });
 };
 
+/**
+ * GET /api/messages/conversations/:conversationId/media
+ */
+router.get('/conversations/:conversationId/media', requireAuth, (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const media = all("SELECT * FROM media_messages WHERE conversation_id = ? AND media_type IN ('image', 'video') ORDER BY created_at DESC", conversationId);
+    res.json(media);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch conversation media' });
+  }
+});
+
+/**
+ * GET /api/messages/conversations/:conversationId/files
+ */
+router.get('/conversations/:conversationId/files', requireAuth, (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const files = all("SELECT * FROM media_messages WHERE conversation_id = ? AND media_type = 'file' ORDER BY created_at DESC", conversationId);
+    res.json(files);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch conversation files' });
+  }
+});
+
+/**
+ * GET /api/messages/conversations/:conversationId/links
+ */
+router.get('/conversations/:conversationId/links', requireAuth, (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    // Basic regex for URLs in message text
+    const messagesWithLinks = all("SELECT * FROM messages WHERE conversation_id = ? AND (message_text LIKE '%http://%' OR message_text LIKE '%https://%') ORDER BY created_at DESC", conversationId);
+    res.json(messagesWithLinks);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch conversation links' });
+  }
+});
+
+/**
+ * POST /api/messages/contact-card
+ */
+router.post('/contact-card', requireAuth, (req, res) => {
+  try {
+    const { to, contactUserId } = req.body;
+    const from = req.user.id;
+    
+    const contactUser = get("SELECT id, username, avatar, phone FROM users WHERE id = ?", contactUserId);
+    if (!contactUser) return res.status(404).json({ error: 'Contact user not found' });
+
+    // In a real implementation, we'd emit a socket event here too.
+    // For now, we return the contact card metadata for the client to send via socket.
+    res.json({
+      success: true,
+      contact: {
+        id: contactUser.id,
+        username: contactUser.username,
+        avatar: contactUser.avatar,
+        phone: contactUser.phone
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate contact card' });
+  }
+});
+
 export const markAsRead = (req, res) => {
   const { messageId } = req.body;
   messageQueueService.updateMessageStatus(messageId, 'read');

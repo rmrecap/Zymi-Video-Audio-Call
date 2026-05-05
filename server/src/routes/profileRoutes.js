@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { incrementTokenVersion } from '../services/sessionService.js';
 import { logAudit } from '../services/auditService.js';
 import { getApp } from '../../index.js';
+import * as profileService from '../services/profileService.js';
 
 const mapUserToSettings = (user) => ({
   userId: user.id,
@@ -15,38 +16,39 @@ const mapUserToSettings = (user) => ({
 
 export const getProfile = (req, res) => {
   const userId = req.user.id;
-  const user = get('SELECT id, username, role, is_banned, avatar, created_at FROM users WHERE id = ?', userId);
+  const profile = profileService.getProfile(userId);
 
-  if (!user) {
+  if (!profile) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  res.json({
-    id: user.id,
-    username: user.username,
-    role: user.role,
-    isBanned: user.is_banned,
-    avatar: user.avatar || null,
-    createdAt: user.created_at
-  });
+  res.json(profile);
+};
+
+export const getMyProfile = (req, res) => {
+  const profile = profileService.getProfile(req.user.id);
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+  res.json(profile);
 };
 
 export const updateProfile = (req, res) => {
   const userId = req.user.id;
-  const { username } = req.body;
+  const result = profileService.updateProfile(userId, req.body);
 
-  if (!username || username.length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(400).json({ error: result.error });
   }
+};
 
-  const existing = get('SELECT id FROM users WHERE username = ? AND id != ?', username, userId);
-  if (existing) {
-    return res.status(400).json({ error: 'Username already taken' });
+export const updateMyProfile = (req, res) => {
+  const result = profileService.updateProfile(req.user.id, req.body);
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(400).json({ error: result.error });
   }
-
-  run('UPDATE users SET username = ? WHERE id = ?', username, userId);
-
-  res.json({ success: true, username });
 };
 
 export const getUserSettings = (req, res) => {

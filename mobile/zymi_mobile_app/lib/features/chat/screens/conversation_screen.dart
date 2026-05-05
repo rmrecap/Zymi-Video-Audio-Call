@@ -4,6 +4,8 @@ import '../models/zymi_message.dart';
 import '../widgets/message_status_indicator.dart';
 import '../widgets/offline_sync_banner.dart';
 import '../widgets/media_message_bubble.dart';
+import '../widgets/attachment_hub_sheet.dart';
+import '../../../core/navigation/zymi_routes.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String peerId;
@@ -83,6 +85,37 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.call_outlined, color: Colors.blueAccent),
+            onPressed: () {
+               Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
+                 'peerId': widget.peerId,
+                 'peerName': widget.peerName,
+                 'isVideo': false,
+               });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined, color: Colors.blueAccent),
+            onPressed: () {
+               Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
+                 'peerId': widget.peerId,
+                 'peerName': widget.peerName,
+                 'isVideo': true,
+               });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () {
+               Navigator.pushNamed(context, ZymiRoutes.contactDetail, arguments: {
+                 'userId': widget.peerId,
+                 'username': widget.peerName,
+               });
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -154,35 +187,76 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
+  void _showAttachmentHub() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AttachmentHubSheet(
+        onMediaSelected: (path, type) {
+          _controller.sendMedia(path, type);
+        },
+        onActionSelected: (content, type) {
+          _controller.sendMessage(content, type: type);
+        },
+      ),
+    );
+  }
+
   Widget _buildInputArea() {
     return Container(
-      padding: const EdgeInsets.all(8),
-      color: const Color(0xFF1e293b),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1e293b),
+        border: Border(top: BorderSide(color: Colors.white10)),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           IconButton(
             onPressed: () {
-              // Placeholder for media picker
-              _controller.sendMedia('/path/to/test/image.jpg', 'image');
+              // Emoji picker placeholder
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Emoji picker coming soon')));
             },
+            icon: const Icon(Icons.sentiment_satisfied_alt_outlined, color: Colors.white54),
+          ),
+          IconButton(
+            onPressed: _showAttachmentHub,
             icon: const Icon(Icons.attach_file, color: Colors.white54),
           ),
           Expanded(
-            child: TextField(
-              controller: _messageController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: 'Type a message...',
-                hintStyle: TextStyle(color: Colors.white54),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0f172a),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: TextField(
+                controller: _messageController,
+                maxLines: 5,
+                minLines: 1,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Type a message...',
+                  hintStyle: TextStyle(color: Colors.white54),
+                  border: InputBorder.none,
+                ),
               ),
             ),
           ),
-          IconButton(
-            onPressed: _sendMessage,
-            icon: const Icon(Icons.send, color: Colors.blueAccent),
-          ),
+          const SizedBox(width: 8),
+          _messageController.text.trim().isEmpty
+              ? IconButton(
+                  onPressed: () {
+                    // Voice record placeholder
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice recording coming soon')));
+                  },
+                  icon: const Icon(Icons.mic_none_outlined, color: Colors.blueAccent),
+                )
+              : IconButton(
+                  onPressed: _sendMessage,
+                  icon: const Icon(Icons.send, color: Colors.blueAccent),
+                ),
         ],
       ),
     );

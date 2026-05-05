@@ -5,7 +5,7 @@ import { run, all, get } from '../db/database.js';
  * Sets status to 'queued' if the receiver is offline.
  */
 export const enqueueMessage = (messageData) => {
-  const { sender_id, receiver_id, content, message_type, client_message_id, conversation_id, delivery_status = 'sent' } = messageData;
+  const { sender_id, receiver_id, content, message_type, client_message_id, conversation_id, delivery_status = 'sent', metadata } = messageData;
   
   // Prevent duplicates by client_message_id
   if (client_message_id) {
@@ -13,14 +13,16 @@ export const enqueueMessage = (messageData) => {
     if (existing) return existing.id;
   }
 
+  const metadataStr = metadata ? (typeof metadata === 'string' ? metadata : JSON.stringify(metadata)) : null;
+
   const result = run(`
     INSERT INTO messages (
       sender_id, receiver_id, message_text, content, message_type, 
-      client_message_id, conversation_id, delivery_status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      client_message_id, conversation_id, delivery_status, metadata, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
   `, 
   sender_id, receiver_id, content, content, message_type || 'text', 
-  client_message_id, conversation_id, delivery_status
+  client_message_id, conversation_id, delivery_status, metadataStr
   );
 
   return result.lastInsertRowid;

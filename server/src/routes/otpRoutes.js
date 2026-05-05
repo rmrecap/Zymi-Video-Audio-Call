@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/authMiddleware.js';
-import { requestEmailOTP, verifyEmailOTP, requestPhoneVerificationLink, verifyPhoneOTP, markTokenOpened, checkTokenStatus } from '../services/otpService.js';
+import { requestEmailOTP, verifyEmailOTP, requestPhoneVerificationLink, verifyPhoneOTP, verifyPhoneOTPInline, markTokenOpened, checkTokenStatus } from '../services/otpService.js';
 import { normalizePhone } from '../utils/phoneNormalizer.js';
 import { updateProfileCompletion } from '../services/profileCompletionService.js';
 import { logAudit } from '../services/auditService.js';
@@ -40,7 +40,7 @@ router.post('/phone/request-link', requireAuth, async (req, res) => {
   if (!normalized) return res.status(400).json({ error: 'Invalid phone number' });
 
   try {
-    const { token, expiresAt } = await requestPhoneVerificationLink(req.user.id, {
+    const { token, otp, expiresAt } = await requestPhoneVerificationLink(req.user.id, {
       phoneNormalized: normalized,
       countryCode,
       countryName,
@@ -49,13 +49,40 @@ router.post('/phone/request-link', requireAuth, async (req, res) => {
 
     const link = `${req.protocol}://${req.get('host')}/verify/phone/${token}`;
     
+    // Check if inline display is allowed
+    const displayOtpAllowed = process.env.SELF_HOSTED_PHONE_OTP_DISPLAY === 'true';
+    
     // Mask phone for auditing
     const maskedPhone = normalized.replace(/(\+\d{3})\d+(\d{2})/, '$1*****$2');
     logAudit(req.user.id, 'phone_otp_link_requested', req.user.id, `Phone link requested for ${maskedPhone}`);
 
-    res.json({ success: true, link, expiresAt });
+    res.json({ 
+      success: true, 
+      link, 
+      expiresAt,
+      displayOtpAllowed,
+      otpPreview: displayOtpAllowed ? otp : null
+    });
   } catch (err) {
+    console.error('[OTP] Error:', err);
     res.status(500).json({ error: 'Failed to generate link' });
+  }
+});
+
+router.post('/phone/verify-inline', requireAuth, async (req, res) => {
+  const { otp } = req.body;
+  if (!otp) return res.status(400).json({ error: 'OTP required' });
+
+  try {
+    const result = verifyPhoneOTPInline(req.user.id, otp);
+    if (result.success) {
+      updateProfileCompletion(req.user.id);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: result.error });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Verification failed' });
   }
 });
 

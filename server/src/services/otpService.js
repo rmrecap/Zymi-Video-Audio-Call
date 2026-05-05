@@ -65,7 +65,24 @@ export const requestPhoneVerificationLink = async (userId, phoneData) => {
   userId
   );
 
-  return { token, expiresAt };
+  return { token, otp, expiresAt };
+};
+
+export const verifyPhoneOTPInline = (userId, otp) => {
+  const otpHash = hashToken(otp);
+  
+  const otpToken = get(`
+    SELECT * FROM otp_tokens 
+    WHERE user_id = ? AND type = 'phone' AND is_used = 0 AND expires_at > CURRENT_TIMESTAMP
+  `, userId);
+
+  if (!otpToken) return { success: false, error: 'No active verification session' };
+  if (otpToken.otp_hash !== otpHash) return { success: false, error: 'Invalid OTP' };
+
+  run('UPDATE otp_tokens SET is_used = 1 WHERE id = ?', otpToken.id);
+  run('UPDATE users SET phone_verified = 1, verification_status = "verified" WHERE id = ?', userId);
+
+  return { success: true };
 };
 
 export const verifyPhoneOTP = (token, otp) => {

@@ -6,6 +6,7 @@ class PrivateMessagePayload {
   final String content;
   final String tempId;
   final String messageType;
+  final Map<String, dynamic>? metadata;
 
   PrivateMessagePayload({
     required this.to,
@@ -13,6 +14,7 @@ class PrivateMessagePayload {
     required this.content,
     required this.tempId,
     this.messageType = 'text',
+    this.metadata,
   });
 
   Map<String, dynamic> toJson() {
@@ -22,6 +24,7 @@ class PrivateMessagePayload {
       'content': content,
       'tempId': tempId,
       'message_type': messageType,
+      'metadata': metadata,
     };
   }
 }

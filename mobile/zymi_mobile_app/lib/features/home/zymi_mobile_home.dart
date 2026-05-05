@@ -7,6 +7,7 @@ import '../diagnostics/mobile_diagnostics_screen.dart';
 import '../../services/api/auth_service.dart';
 import '../verification/widgets/verification_status_bar.dart';
 import '../../core/navigation/zymi_routes.dart';
+import '../profile/screens/profile_screen.dart';
 
 class ZymiMobileHome extends StatefulWidget {
   const ZymiMobileHome({super.key});
@@ -84,7 +85,8 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
       case 0: return const ConversationListScreen();
       case 1: return const CallPlaceholderScreen();
       case 2: return const Center(child: Text('Nearby (Pending)', style: TextStyle(color: Colors.white)));
-      case 3: return const MobileDiagnosticsScreen();
+      case 3: return const ProfileScreen();
+      case 4: return const MobileDiagnosticsScreen();
       default: return const Center(child: Text('Unknown'));
     }
   }
@@ -154,6 +156,7 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
           BottomNavigationBarItem(icon: Icon(Icons.call_outlined), label: 'Calls'),
           BottomNavigationBarItem(icon: Icon(Icons.radar), label: 'Nearby'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
           BottomNavigationBarItem(icon: Icon(Icons.bug_report_outlined), label: 'Debug'),
         ],
       ),

@@ -5,7 +5,16 @@ import '../../core/runtime/app_runtime_state.dart';
 import '../../core/runtime/runtime_state_binder.dart';
 
 class CallPreflightScreen extends StatefulWidget {
-  const CallPreflightScreen({super.key});
+  final String peerId;
+  final String peerName;
+  final bool isVideo;
+
+  const CallPreflightScreen({
+    super.key,
+    required this.peerId,
+    required this.peerName,
+    this.isVideo = false,
+  });
 
   @override
   State<CallPreflightScreen> createState() => _CallPreflightScreenState();

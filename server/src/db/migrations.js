@@ -104,6 +104,16 @@ export const runMigrations = () => {
       exec("ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0");
       console.log('[MIGRATION] Added phone_verified column to users');
     }
+
+    if (!columnExists('users', 'display_name')) {
+      exec("ALTER TABLE users ADD COLUMN display_name TEXT");
+      console.log('[MIGRATION] Added display_name column to users');
+    }
+
+    if (!columnExists('users', 'status_text')) {
+      exec("ALTER TABLE users ADD COLUMN status_text TEXT");
+      console.log('[MIGRATION] Added status_text column to users');
+    }
   
   if (!tableExists('messages')) {
     exec(`
@@ -654,6 +664,9 @@ if (!columnExists('messages', 'previous_content')) {
     }
     if (!columnExists('messages', 'read_at')) {
       exec("ALTER TABLE messages ADD COLUMN read_at DATETIME");
+    }
+    if (!columnExists('messages', 'metadata')) {
+      exec("ALTER TABLE messages ADD COLUMN metadata TEXT");
     }
   }
 
