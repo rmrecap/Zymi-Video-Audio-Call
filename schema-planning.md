@@ -1,185 +1,131 @@
-# ZYMI PostgreSQL Database Schema Plan
+# ZYMI Database Schema Planning
 
-> **Goal:** Establish a robust, scalable, and normalized relational database architecture for the ZYMI ecosystem.
-> **Extensions Required:** `uuid-ossp` (for generating UUIDs) and `postgis` (for geospatial indexing and "Nearby" features).
-
----
-
-## 1. Entity-Relationship (ER) Overview
-
-```mermaid
-erDiagram
-    USERS ||--o{ MESSAGES : sends
-    USERS ||--o{ MESSAGES : receives
-    USERS ||--o{ GROUP_MEMBERS : "belongs to"
-    GROUPS ||--o{ GROUP_MEMBERS : contains
-    GROUPS ||--o{ MESSAGES : "has"
-    USERS ||--o{ CALL_HISTORY : "initiates/receives"
-    USERS ||--o{ BLOCKED_USERS : "blocks"
-    USERS ||--o{ USER_BADGES : "earns"
-    BADGES ||--o{ USER_BADGES : "awarded to"
-    USERS ||--o{ MESSAGE_REPORTS : "submits"
-    MESSAGES ||--o{ MESSAGE_REPORTS : "is reported"
-```
+**Role:** Lead Database Architect  
+**Objective:** Design a production-grade, horizontally scalable PostgreSQL schema supporting real-time communication, geospatial discovery, and high-concurrency messaging.
 
 ---
 
-## 2. Core Identity & Authentication
+## 1. Core Configuration & Extensions
 
-### `users`
-The central identity table. Includes PostGIS geospatial types for the "Nearby" feature.
-*   `id`: `UUID` (Primary Key, Default: uuid_generate_v4())
-*   `username`: `VARCHAR(50)` (Unique, Indexed)
-*   `email`: `VARCHAR(255)` (Unique, Indexed)
-*   `password_hash`: `VARCHAR(255)` (Not null)
-*   `phone_normalized`: `VARCHAR(20)` (Unique, Indexed, used for internal lookup)
-*   `email_verified`: `BOOLEAN` (Default: false)
-*   `role`: `VARCHAR(20)` (Default: 'user', Options: 'user', 'admin')
-*   `avatar_url`: `VARCHAR(255)`
-*   `status`: `VARCHAR(50)` (e.g., 'Available', 'Busy' - updated via sockets)
-*   **`location`**: `geometry(Point, 4326)` (PostGIS spatial column for Nearby features)
-*   `last_location_update`: `TIMESTAMP WITH TIME ZONE`
-*   `created_at`: `TIMESTAMP WITH TIME ZONE` (Default: NOW())
-*   `updated_at`: `TIMESTAMP WITH TIME ZONE`
-
-### `otp_tokens`
-Manages 2FA and email verification single-use codes.
-*   `id`: `UUID` (Primary Key)
-*   `user_id`: `UUID` (Foreign Key -> `users.id`, Indexed)
-*   `token_hash`: `VARCHAR(255)` (Encrypted OTP value)
-*   `type`: `VARCHAR(50)` (e.g., 'email_verify', 'password_reset')
-*   `expires_at`: `TIMESTAMP WITH TIME ZONE` (Indexed for cleanup)
-*   `used`: `BOOLEAN` (Default: false)
-
----
-
-## 3. Real-Time Chat & Groups
-
-### `messages`
-Stores both 1-on-1 and Group messages.
-*   `id`: `UUID` (Primary Key)
-*   `sender_id`: `UUID` (Foreign Key -> `users.id`, Indexed)
-*   `recipient_id`: `UUID` (Foreign Key -> `users.id`, Nullable - used for 1-on-1)
-*   `group_id`: `UUID` (Foreign Key -> `groups.id`, Nullable - used for group chat)
-*   `body`: `TEXT` (Encrypted at application layer if E2EE is enabled)
-*   `message_type`: `VARCHAR(20)` (e.g., 'text', 'image', 'video', 'system')
-*   `status`: `VARCHAR(20)` (e.g., 'sent', 'delivered', 'seen', 'failed')
-*   `attachment_url`: `VARCHAR(255)` (Nullable)
-*   `created_at`: `TIMESTAMP WITH TIME ZONE` (Indexed for timeline sorting)
-
-### `groups`
-Represents a multi-user chat room.
-*   `id`: `UUID` (Primary Key)
-*   `name`: `VARCHAR(100)`
-*   `description`: `TEXT`
-*   `avatar_url`: `VARCHAR(255)`
-*   `created_by`: `UUID` (Foreign Key -> `users.id`)
-*   `created_at`: `TIMESTAMP WITH TIME ZONE`
-
-### `group_members` (Many-to-Many Relationship)
-Junction table linking `users` to `groups`.
-*   `group_id`: `UUID` (Foreign Key -> `groups.id`)
-*   `user_id`: `UUID` (Foreign Key -> `users.id`)
-*   `role`: `VARCHAR(20)` (Default: 'member', Options: 'admin', 'member')
-*   `joined_at`: `TIMESTAMP WITH TIME ZONE`
-*   **Primary Key**: Composite (`group_id`, `user_id`)
-
----
-
-## 4. WebRTC Call History
-
-### `call_history`
-Persists the outcome of signaling handshakes and media streams.
-*   `id`: `UUID` (Primary Key)
-*   `caller_id`: `UUID` (Foreign Key -> `users.id`, Indexed)
-*   `callee_id`: `UUID` (Foreign Key -> `users.id`, Nullable for group calls)
-*   `group_id`: `UUID` (Foreign Key -> `groups.id`, Nullable)
-*   `call_type`: `VARCHAR(20)` ('audio', 'video')
-*   `status`: `VARCHAR(20)` ('missed', 'completed', 'rejected', 'failed')
-*   `duration_seconds`: `INTEGER` (Default: 0)
-*   `started_at`: `TIMESTAMP WITH TIME ZONE`
-*   `ended_at`: `TIMESTAMP WITH TIME ZONE`
-
----
-
-## 5. Gamification System
-
-### `user_points`
-*   `id`: `UUID` (Primary Key)
-*   `user_id`: `UUID` (Foreign Key -> `users.id`)
-*   `points`: `INTEGER`
-*   `source`: `VARCHAR(100)` (e.g., 'daily_login', 'profile_completion')
-*   `created_at`: `TIMESTAMP WITH TIME ZONE`
-
-### `badges`
-*   `id`: `UUID` (Primary Key)
-*   `name`: `VARCHAR(100)`
-*   `description`: `TEXT`
-*   `icon_url`: `VARCHAR(255)`
-*   `rule_key`: `VARCHAR(50)` (e.g., '100_calls', '1_year_anniversary')
-
-### `user_badges` (Many-to-Many Relationship)
-*   `user_id`: `UUID` (Foreign Key -> `users.id`)
-*   `badge_id`: `UUID` (Foreign Key -> `badges.id`)
-*   `awarded_at`: `TIMESTAMP WITH TIME ZONE`
-*   **Primary Key**: Composite (`user_id`, `badge_id`)
-
----
-
-## 6. Moderation & Security
-
-### `blocked_users`
-*   `blocker_id`: `UUID` (Foreign Key -> `users.id`)
-*   `blocked_id`: `UUID` (Foreign Key -> `users.id`)
-*   `created_at`: `TIMESTAMP WITH TIME ZONE`
-*   **Primary Key**: Composite (`blocker_id`, `blocked_id`)
-
-### `message_reports`
-*   `id`: `UUID` (Primary Key)
-*   `reporter_id`: `UUID` (Foreign Key -> `users.id`)
-*   `message_id`: `UUID` (Foreign Key -> `messages.id`)
-*   `reason`: `VARCHAR(255)` (e.g., 'spam', 'harassment')
-*   `status`: `VARCHAR(20)` (Default: 'pending', Options: 'reviewed', 'action_taken', 'dismissed')
-*   `created_at`: `TIMESTAMP WITH TIME ZONE`
-
-### `auth_audit_logs`
-*   `id`: `UUID` (Primary Key)
-*   `user_id`: `UUID` (Foreign Key -> `users.id`, Nullable for failed logins)
-*   `action`: `VARCHAR(50)` (e.g., 'login_success', 'login_failure', 'password_change')
-*   `ip_masked`: `VARCHAR(50)` (Privacy-preserving IP log, e.g., '192.168.1.***')
-*   `created_at`: `TIMESTAMP WITH TIME ZONE`
-
----
-
-## 7. ZRCS (ZYMI Remote Ad-Control System)
-
-These tables govern the admin-controlled monetization layers.
-
-*   **`ad_global_settings`**: `id` (PK), `ads_enabled` (BOOLEAN), `active_network`, `test_mode`.
-*   **`ad_network_configs`**: `network_key` (PK), `app_id`, `interstitial_id`, `native_id`, `is_active`.
-*   **`ad_placements`**: `placement_key` (PK), `enabled` (BOOLEAN), `min_delay_seconds`.
-
----
-
-## 8. Geospatial Indexing Strategy (Nearby Feature)
-
-To achieve high-performance spatial queries for the "Nearby" feature, we apply a PostGIS GIST index to the `users.location` column:
+To support global uniqueness and high-performance geospatial queries, the following PostgreSQL extensions must be enabled:
 
 ```sql
--- Enables fast bounding-box and radius proximity searches
-CREATE INDEX idx_users_location ON users USING GIST (location);
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";     -- For UUID generation
+CREATE EXTENSION IF NOT EXISTS "postgis";       -- For GEOMETRY type and spatial indexing
 ```
 
-**Query Example for Nearby Discovery:**
-```sql
--- Find users within 5 kilometers (5000 meters) of the querying user's coordinates
-SELECT id, username, avatar_url, status
-FROM users
-WHERE ST_DWithin(
-  location,
-  ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
-  5000
-)
-AND id != :current_user_id
-AND status = 'Available';
-```
+---
+
+## 2. Logical Creation Sequence
+
+The schema must be established in the following order to respect foreign key constraints:
+
+1.  **`users`**: The root entity for all interactions.
+2.  **`otp_tokens`**: Dependent on users for authentication flow.
+3.  **`messages`**: Dependent on two users (sender/receiver).
+4.  **`call_history`**: Dependent on two users (caller/callee).
+5.  **`blocked_users`**: Intersection table for user privacy/moderation.
+
+---
+
+## 3. Detailed Table Specifications
+
+### 3.1 Table: `users`
+The master record for all ZYMI participants, including real-time location data.
+
+| Column | Data Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Global unique identifier. |
+| `email` | VARCHAR(255) | UNIQUE, NOT NULL | Primary login identifier. |
+| `phone_normalized` | VARCHAR(20) | UNIQUE, NOT NULL | Formatted phone for internal lookup. |
+| `password_hash` | TEXT | NOT NULL | Bcrypt hashed password. |
+| `display_name` | VARCHAR(100) | NOT NULL | User's public name. |
+| `avatar_url` | TEXT | | Cloud storage link to profile image. |
+| `status` | VARCHAR(20) | DEFAULT 'pending' | 'pending', 'verified', 'banned'. |
+| `last_location` | GEOMETRY(Point, 4326) | | PostGIS point for "Nearby" feature. |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | Record creation time. |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | Last profile update. |
+
+**Indexing:**
+*   `GIST(last_location)`: Critical for high-performance radius searches.
+*   `B-TREE(email)`: For fast login lookups.
+*   `B-TREE(phone_normalized)`: For peer discovery by contact list.
+
+---
+
+### 3.2 Table: `otp_tokens`
+Handles the short-lived tokens for registration and password resets.
+
+| Column | Data Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Unique token ID. |
+| `user_id` | UUID | FK -> users.id, NOT NULL | Associated user. |
+| `token_hash` | TEXT | NOT NULL | Encrypted OTP code. |
+| `type` | VARCHAR(20) | NOT NULL | 'email_verification', 'password_reset'. |
+| `expires_at` | TIMESTAMP | NOT NULL | 5-minute expiry constraint. |
+
+**Relationship:** 1:N (A user can have multiple tokens, but only the latest valid one is typically used).  
+**Indexing:** `B-TREE(user_id, expires_at)`.
+
+---
+
+### 3.3 Table: `messages`
+The high-concurrency log of all private communications.
+
+| Column | Data Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Unique message ID. |
+| `sender_id` | UUID | FK -> users.id, NOT NULL | The message author. |
+| `receiver_id` | UUID | FK -> users.id, NOT NULL | The message recipient. |
+| `content` | TEXT | NOT NULL | The message body. |
+| `status` | VARCHAR(20) | DEFAULT 'sent' | 'sent', 'delivered', 'seen', 'failed'. |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | Time sent. |
+| `delivered_at` | TIMESTAMP | | Time received by recipient's device. |
+| `seen_at` | TIMESTAMP | | Time opened by recipient. |
+
+**Relationship:** 1:N (Users participate in many messages).  
+**Indexing:**
+*   `B-TREE(sender_id, receiver_id)`: For fetching conversation history.
+*   `B-TREE(created_at)`: For sorting chat threads.
+
+---
+
+### 3.4 Table: `call_history`
+Tracks the lifecycle of WebRTC media sessions.
+
+| Column | Data Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Unique call session ID. |
+| `caller_id` | UUID | FK -> users.id, NOT NULL | The initiator. |
+| `receiver_id` | UUID | FK -> users.id, NOT NULL | The target peer. |
+| `status` | VARCHAR(20) | NOT NULL | 'completed', 'missed', 'rejected', 'dropped'. |
+| `duration_seconds` | INT | DEFAULT 0 | Total call time in seconds. |
+| `started_at` | TIMESTAMP | DEFAULT NOW() | Call initiation time. |
+| `ended_at` | TIMESTAMP | | Call termination time. |
+
+**Relationship:** 1:N (Users participate in many calls).  
+**Indexing:** `B-TREE(caller_id, receiver_id, started_at)`.
+
+---
+
+### 3.5 Table: `blocked_users`
+Manages user-level privacy and moderation.
+
+| Column | Data Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Unique record ID. |
+| `blocker_id` | UUID | FK -> users.id, NOT NULL | User performing the block. |
+| `blocked_id` | UUID | FK -> users.id, NOT NULL | User being blocked. |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | Timestamp of the block. |
+
+**Relationship:** N:M (Users can block many, and be blocked by many).  
+**Indexing:** `UNIQUE(blocker_id, blocked_id)`: Prevents duplicate block records.
+
+---
+
+## 4. Performance & Scalability Strategy
+
+1.  **UUID v4 vs v7:** While v4 is standard, consider UUID v7 if timestamp-sorting of primary keys is required for better B-tree index performance.
+2.  **GIST Indexes:** The `last_location` column must use a GIST index to allow PostGIS to perform `ST_DWithin` queries in logarithmic time rather than linear table scans.
+3.  **Partitioning:** For the `messages` and `call_history` tables, consider **Range Partitioning** by `created_at` (e.g., monthly partitions) as the dataset grows into the millions.
+4.  **Soft Deletes:** Implement a `deleted_at` column in `users` and `messages` if regulatory compliance (GDPR/CCPA) requires data retention for a period after "deletion."
