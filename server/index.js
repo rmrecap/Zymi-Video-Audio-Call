@@ -19,6 +19,9 @@ runMigrations();
 import { initAdminSeed } from './src/config/adminSeed.js';
 initAdminSeed();
 
+import { seedDemoUsers } from './src/db/seed_demo_users.js';
+seedDemoUsers();
+
 import { createBlockTable } from './src/services/blockService.js';
 createBlockTable();
 
@@ -44,7 +47,6 @@ import { authRateLimit, exportRateLimit } from './src/middleware/rateLimit.js';
 
 import { setupCallSocket } from './src/socket/callSocket.js';
 import { setupChatSocket } from './src/socket/chatSocket.js';
-import { get, run } from './src/db/database.js';
 import { isBlocked } from './src/routes/blockRoutes.js';
 
 import { register, login, adminLogin } from './src/routes/authRoutes.js';

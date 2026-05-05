@@ -13,7 +13,9 @@ enum CallState { idle, outgoingRinging, incomingRinging, connecting, connected, 
 class CallController extends ChangeNotifier {
   static final CallController _instance = CallController._internal();
   factory CallController() => _instance;
-  CallController._internal();
+  CallController._internal() {
+    _setupSignaling();
+  }
 
   CallState state = CallState.idle;
   
@@ -119,7 +121,6 @@ class CallController extends ChangeNotifier {
     _isRemoteDescriptionSet = false;
     _remoteIceCandidates.clear();
     queuedIceCount = 0;
-    _setupSignaling();
 
     _setState(CallState.outgoingRinging);
     _ringTimer?.cancel();

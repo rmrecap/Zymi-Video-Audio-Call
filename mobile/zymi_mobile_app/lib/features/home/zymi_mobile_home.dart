@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../../services/realtime/zymi_socket_client.dart';
 import '../chat/screens/conversation_list_screen.dart';
 import '../call/call_placeholder_screen.dart';
+import '../nearby/screens/nearby_screen.dart';
 import '../diagnostics/mobile_diagnostics_screen.dart';
 import '../../services/api/auth_service.dart';
 import '../verification/widgets/verification_status_bar.dart';
 import '../../core/navigation/zymi_routes.dart';
 import '../profile/screens/profile_screen.dart';
+import '../call/controllers/call_controller.dart';
+import '../call/screens/incoming_call_screen.dart';
 
 class ZymiMobileHome extends StatefulWidget {
   const ZymiMobileHome({super.key});
@@ -24,6 +27,7 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
   final ZymiSocketClient _socketClient = ZymiSocketClient();
   final AuthService _authService = AuthService();
   StreamSubscription<ZymiSocketStatus>? _socketSub;
+  final CallController _callController = CallController();
 
   @override
   void initState() {
@@ -31,7 +35,25 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
     _socketSub = _socketClient.statusStream.listen((_) {
       if (mounted) setState(() {});
     });
+    _callController.addListener(_handleCallStateChange);
     _initAuthAndSocket();
+  }
+
+  void _handleCallStateChange() {
+    if (_callController.state == CallState.incomingRinging) {
+      // Show incoming call screen
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => IncomingCallScreen(
+            callerId: 'Incoming Call', // In a real app, get this from controller
+            callType: 'video', // In a real app, get this from controller
+            currentUserId: _localUserId ?? '',
+            onReject: () => _callController.rejectCall(_localUserId ?? ''),
+            onAccept: () => _callController.acceptCall(_localUserId ?? ''),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _initAuthAndSocket() async {
@@ -53,6 +75,7 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
   @override
   void dispose() {
     _socketSub?.cancel();
+    _callController.removeListener(_handleCallStateChange);
     super.dispose();
   }
 
@@ -84,7 +107,7 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
     switch (_currentIndex) {
       case 0: return const ConversationListScreen();
       case 1: return const CallPlaceholderScreen();
-      case 2: return const Center(child: Text('Nearby (Pending)', style: TextStyle(color: Colors.white)));
+      case 2: return const NearbyScreen();
       case 3: return const ProfileScreen();
       case 4: return const MobileDiagnosticsScreen();
       default: return const Center(child: Text('Unknown'));
@@ -157,7 +180,6 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
           BottomNavigationBarItem(icon: Icon(Icons.call_outlined), label: 'Calls'),
           BottomNavigationBarItem(icon: Icon(Icons.radar), label: 'Nearby'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.bug_report_outlined), label: 'Debug'),
         ],
       ),
     );

@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs';
-import { get, run } from '../db/database.js';
+import { db } from '../db/db_provider.js';
 import { createToken } from '../services/sessionService.js';
 import { logAudit } from '../services/auditService.js';
 import { requestEmailOTP, verifyEmailOTP } from '../services/otpService.js';
 import { updateProfileCompletion } from '../services/profileCompletionService.js';
 
-export const register = (req, res) => {
+export const register = async (req, res) => {
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
@@ -14,11 +14,11 @@ export const register = (req, res) => {
 
   try {
     const hash = bcrypt.hashSync(password, 12);
-    const result = run(
-      'INSERT INTO users (username, email, password, role, profile_completion) VALUES (?, ?, ?, ?, ?)', 
+    const result = await db.run(
+      'INSERT INTO users (username, email, password_hash, role, profile_completion) VALUES (?, ?, ?, ?, ?)', 
       username, email, hash, 'user', 40
     );
-    const user = get('SELECT id, username, email, role, token_version FROM users WHERE id = ?', result.lastInsertRowid);
+    const user = await db.get('SELECT id, username, email, role, token_version FROM users WHERE id = ?', result.lastInsertRowid);
     const token = createToken(user);
     
     // Mask email for auditing
@@ -27,23 +27,23 @@ export const register = (req, res) => {
 
     res.json({ id: user.id, username: user.username, email: user.email, role: user.role, token });
   } catch (err) {
-    if (err.message.includes('UNIQUE constraint failed: users.email')) {
+    if (err.message.includes('UNIQUE constraint failed: users.email') || err.message.includes('duplicate key value')) {
       return res.status(400).json({ error: 'Email already exists' });
     }
     res.status(400).json({ error: 'Username already exists' });
   }
 };
 
-export const login = (req, res) => {
+export const login = async (req, res) => {
   const { username, password } = req.body; // username can be email or username
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Credentials and password required' });
   }
 
-  const user = get('SELECT * FROM users WHERE username = ? OR email = ?', username, username);
+  const user = await db.get('SELECT * FROM users WHERE username = ? OR email = ?', username, username);
 
-  if (!user || !bcrypt.compareSync(password, user.password)) {
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
@@ -51,7 +51,7 @@ export const login = (req, res) => {
     return res.status(403).json({ error: 'Account suspended' });
   }
 
-  run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', user.id);
+  await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', user.id);
 
   const token = createToken(user);
   res.json({
@@ -63,14 +63,14 @@ export const login = (req, res) => {
   });
 };
 
-export const logout = (req, res) => {
+export const logout = async (req, res) => {
   // Client handles token removal, but we can log it
   logAudit(req.user?.id, 'user_logout', req.user?.id, 'User logged out');
   res.json({ success: true });
 };
 
-export const me = (req, res) => {
-  const user = get(`
+export const me = async (req, res) => {
+  const user = await db.get(`
     SELECT id, username, email, role, email_verified, phone_verified, 
            profile_completion, country_code, country_name, phone_country_iso, 
            phone_normalized, verification_status, last_login_at, avatar
@@ -85,7 +85,7 @@ export const forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const user = get('SELECT id, email FROM users WHERE email = ?', email);
+  const user = await db.get('SELECT id, email FROM users WHERE email = ?', email);
   if (!user) {
     // Return success anyway to prevent user enumeration
     return res.json({ success: true, message: 'If email exists, OTP sent.' });
@@ -99,41 +99,41 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
-export const resetPassword = (req, res) => {
+export const resetPassword = async (req, res) => {
   const { email, otp, newPassword } = req.body;
   if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields required' });
 
-  const user = get('SELECT id FROM users WHERE email = ?', email);
+  const user = await db.get('SELECT id FROM users WHERE email = ?', email);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const verify = verifyEmailOTP(user.id, otp);
+  const verify = await verifyEmailOTP(user.id, otp);
   if (!verify.success) return res.status(400).json({ error: verify.error });
 
   const hash = bcrypt.hashSync(newPassword, 12);
-  run('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?', hash, user.id);
+  await db.run('UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?', hash, user.id);
   
   logAudit(user.id, 'password_reset', user.id, 'User reset password via OTP');
   res.json({ success: true, message: 'Password updated successfully' });
 };
 
-export const adminLogin = (req, res) => {
+export const adminLogin = async (req, res) => {
   const { username, password } = req.body;
   
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
-  const admin = get('SELECT * FROM users WHERE (username = ? OR email = ?) AND role IN (?, ?)', username, username, 'admin', 'super_admin');
+  const admin = await db.get('SELECT * FROM users WHERE (username = ? OR email = ?) AND role IN (?, ?)', username, username, 'admin', 'super_admin');
 
   if (!admin) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
-  if (!bcrypt.compareSync(password, admin.password)) {
+  if (!bcrypt.compareSync(password, admin.password_hash)) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
-  run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', admin.id);
+  await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', admin.id);
 
   const token = createToken(admin);
   res.json({
@@ -142,7 +142,7 @@ export const adminLogin = (req, res) => {
   });
 };
 
-// Router (placed after all handlers to avoid hoisting issues with const arrow functions)
+// Router
 import { Router } from 'express';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { authRateLimit } from '../middleware/rateLimit.js';
