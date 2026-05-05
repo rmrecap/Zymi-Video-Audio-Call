@@ -68,8 +68,6 @@ CREATE TABLE IF NOT EXISTS messages (
     status VARCHAR(20) DEFAULT 'sent',
     attachment_url VARCHAR(255),
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    -- Constraint: A message must have either a recipient (1-on-1) OR a group_id (Group chat), but not both.
     CONSTRAINT chk_message_target CHECK (
         (recipient_id IS NOT NULL AND group_id IS NULL) OR 
         (recipient_id IS NULL AND group_id IS NOT NULL) OR
@@ -91,8 +89,6 @@ CREATE TABLE IF NOT EXISTS call_history (
     duration_seconds INTEGER DEFAULT 0,
     started_at TIMESTAMPTZ DEFAULT NOW(),
     ended_at TIMESTAMPTZ,
-    
-    -- Constraint: A call must have either a callee (1-on-1) OR a group_id (Group call).
     CONSTRAINT chk_call_target CHECK (
         (callee_id IS NOT NULL AND group_id IS NULL) OR 
         (callee_id IS NULL AND group_id IS NOT NULL)

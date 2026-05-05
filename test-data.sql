@@ -10,25 +10,11 @@
 -- ==============================================================================
 INSERT INTO users (id, username, email, password_hash, phone_normalized, email_verified, role, status, location, created_at)
 VALUES 
-    -- User 1: Ahmed in Al Muteena
-    ('11111111-1111-1111-1111-111111111111', 'ahmed_dxb', 'ahmed@zymi.ae', '$2a$10$xyz...', '+971501234567', true, 'user', 'Available', 
-     ST_SetSRID(ST_MakePoint(55.3216, 25.2754), 4326), NOW() - INTERVAL '30 days'),
-    
-    -- User 2: Sarah in Dubai Marina
-    ('22222222-2222-2222-2222-222222222222', 'sarah_marina', 'sarah@zymi.ae', '$2a$10$xyz...', '+971502345678', true, 'user', 'In a call', 
-     ST_SetSRID(ST_MakePoint(55.1403, 25.0805), 4326), NOW() - INTERVAL '25 days'),
-    
-    -- User 3: Omar in Downtown Dubai
-    ('33333333-3333-3333-3333-333333333333', 'omar_downtown', 'omar@zymi.ae', '$2a$10$xyz...', '+971503456789', true, 'user', 'Busy', 
-     ST_SetSRID(ST_MakePoint(55.2744, 25.1972), 4326), NOW() - INTERVAL '20 days'),
-     
-    -- User 4: Fatima in Palm Jumeirah
-    ('44444444-4444-4444-4444-444444444444', 'fatima_palm', 'fatima@zymi.ae', '$2a$10$xyz...', '+971504567890', true, 'user', 'Available', 
-     ST_SetSRID(ST_MakePoint(55.1390, 25.1124), 4326), NOW() - INTERVAL '15 days'),
-     
-    -- User 5: Khalid (Admin) in Deira
-    ('55555555-5555-5555-5555-555555555555', 'admin_khalid', 'khalid_admin@zymi.ae', '$2a$10$xyz...', '+971505678901', true, 'admin', 'Available', 
-     ST_SetSRID(ST_MakePoint(55.3180, 25.2676), 4326), NOW() - INTERVAL '60 days')
+    ('11111111-1111-1111-1111-111111111111', 'ahmed_dxb', 'ahmed@zymi.ae', '$2a$10$xyz...', '+971501234567', true, 'user', 'Available', ST_SetSRID(ST_MakePoint(55.3216, 25.2754), 4326), NOW() - INTERVAL '30 days'),
+    ('22222222-2222-2222-2222-222222222222', 'sarah_marina', 'sarah@zymi.ae', '$2a$10$xyz...', '+971502345678', true, 'user', 'In a call', ST_SetSRID(ST_MakePoint(55.1403, 25.0805), 4326), NOW() - INTERVAL '25 days'),
+    ('33333333-3333-3333-3333-333333333333', 'omar_downtown', 'omar@zymi.ae', '$2a$10$xyz...', '+971503456789', true, 'user', 'Busy', ST_SetSRID(ST_MakePoint(55.2744, 25.1972), 4326), NOW() - INTERVAL '20 days'),
+    ('44444444-4444-4444-4444-444444444444', 'fatima_palm', 'fatima@zymi.ae', '$2a$10$xyz...', '+971504567890', true, 'user', 'Available', ST_SetSRID(ST_MakePoint(55.1390, 25.1124), 4326), NOW() - INTERVAL '15 days'),
+    ('55555555-5555-5555-5555-555555555555', 'admin_khalid', 'khalid_admin@zymi.ae', '$2a$10$xyz...', '+971505678901', true, 'admin', 'Available', ST_SetSRID(ST_MakePoint(55.3180, 25.2676), 4326), NOW() - INTERVAL '60 days')
 ON CONFLICT (id) DO NOTHING;
 
 -- ==============================================================================
@@ -72,15 +58,10 @@ ON CONFLICT (group_id, user_id) DO NOTHING;
 -- ==============================================================================
 INSERT INTO messages (id, sender_id, recipient_id, group_id, body, message_type, status, created_at)
 VALUES 
-    -- Conversation between Ahmed and Omar
     (uuid_generate_v4(), '11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333', NULL, 'Hey Omar, are you going to the Downtown meetup today?', 'text', 'seen', NOW() - INTERVAL '2 hours'),
     (uuid_generate_v4(), '33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', NULL, 'Yes! I will be there around 6 PM.', 'text', 'seen', NOW() - INTERVAL '1 hour 55 minutes'),
-    
-    -- Conversation between Sarah and Fatima
     (uuid_generate_v4(), '22222222-2222-2222-2222-222222222222', '44444444-4444-4444-4444-444444444444', NULL, 'Sending you the Marina running route now.', 'text', 'delivered', NOW() - INTERVAL '30 minutes'),
     (uuid_generate_v4(), '22222222-2222-2222-2222-222222222222', '44444444-4444-4444-4444-444444444444', NULL, 'map_route.jpg', 'image', 'sent', NOW() - INTERVAL '29 minutes'),
-    
-    -- Group Message in Dubai Tech Hub
     (uuid_generate_v4(), '55555555-5555-5555-5555-555555555555', NULL, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Welcome to the group everyone! Please check the pinned rules.', 'system', 'delivered', NOW() - INTERVAL '9 days')
 ON CONFLICT (id) DO NOTHING;
 
