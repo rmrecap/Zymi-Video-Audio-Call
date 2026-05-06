@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { get, all, run } from '../db/database.js';
+import { db } from '../db/db_provider.js';
 import { logAudit, getAuditLogs, getAuditStats } from '../services/auditService.js';
 import { getMetricsSummary } from '../services/metricsService.js';
 import { incrementTokenVersion } from '../services/sessionService.js';
@@ -11,34 +11,39 @@ import { analyzeAdminInsights } from '../services/aiService.js';
 let callActivity = { activeCalls: 0, totalCalls: 0, failedCalls: 0 };
 let serverStartTime = Date.now();
 
-export const getStats = (req, res) => {
-  const userCount = get('SELECT COUNT(*) as count FROM users');
-  const messageCount = get('SELECT COUNT(*) as count FROM messages');
-  const today = new Date().toISOString().split('T')[0];
-  const messagesToday = get("SELECT COUNT(*) as count FROM messages WHERE date(timestamp) = ?", today);
-  const callsToday = get("SELECT COUNT(*) as count FROM admin_audit_logs WHERE action = 'call_started' AND date(timestamp) = ?", today);
-  const activeConnections = req.app.get('userSockets')?.size || 0;
-  const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
-  const dbStatus = get("SELECT name FROM sqlite_master WHERE type='table'") ? 'healthy' : 'error';
-  
-  const metrics = getMetricsSummary();
-  
-  res.json({
-    totalUsers: userCount.count,
-    totalMessages: messageCount.count,
-    messagesToday: messagesToday.count,
-    callsToday: callsToday.count,
-    failedCallsToday: metrics.failedCallsToday,
-    activeConnections,
-    activeCalls: callActivity.activeCalls,
-    totalCalls: callActivity.totalCalls,
-    serverUptime: uptime,
-    dbStatus,
-    metrics
-  });
+export const getStats = async (req, res) => {
+  try {
+    const userCount = await db.get('SELECT COUNT(*) as count FROM users');
+    const messageCount = await db.get('SELECT COUNT(*) as count FROM messages');
+    const today = new Date().toISOString().split('T')[0];
+    const messagesToday = await db.get("SELECT COUNT(*) as count FROM messages WHERE timestamp::date = $1", today);
+    const callsToday = await db.get("SELECT COUNT(*) as count FROM admin_audit_logs WHERE action = 'call_started' AND timestamp::date = $1", today);
+    const activeConnections = req.app.get('userSockets')?.size || 0;
+    const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
+    const dbStatus = 'healthy';
+    
+    const metrics = getMetricsSummary();
+    
+    res.json({
+      totalUsers: parseInt(userCount.count),
+      totalMessages: parseInt(messageCount.count),
+      messagesToday: parseInt(messagesToday.count),
+      callsToday: parseInt(callsToday.count),
+      failedCallsToday: metrics.failedCallsToday,
+      activeConnections,
+      activeCalls: callActivity.activeCalls,
+      totalCalls: callActivity.totalCalls,
+      serverUptime: uptime,
+      dbStatus,
+      metrics
+    });
+  } catch (err) {
+    console.error('[ADMIN] Stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
 };
 
-export const getUsers = (req, res) => {
+export const getUsers = async (req, res) => {
   const { search, includeBanned } = req.query;
   
   let query = `
@@ -51,69 +56,79 @@ export const getUsers = (req, res) => {
   const params = [];
   
   if (!includeBanned) {
-    query += ' WHERE is_banned = 0';
+    query += ' WHERE is_banned = FALSE';
   }
   
   if (search) {
     query += params.length === 0 ? ' WHERE ' : ' AND ';
-    query += 'username LIKE ?';
+    query += 'username ILIKE $1';
     params.push(`%${search}%`);
   }
   
-  query += ' ORDER BY id DESC';
+  query += ' ORDER BY created_at DESC';
   
-  const users = all(query, ...params);
-  res.json(users);
+  try {
+    const users = await db.all(query, ...params);
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
 };
 
-export const banUser = (req, res) => {
+export const banUser = async (req, res) => {
   const { userId, reason } = req.body;
   
   if (!userId) {
     return res.status(400).json({ error: 'User ID required' });
   }
   
-  const user = get('SELECT * FROM users WHERE id = ?', userId);
-  
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+  try {
+    const user = await db.get('SELECT * FROM users WHERE id = ?', userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (user.role === 'admin' || user.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot ban admin' });
+    }
+    
+    await db.run('UPDATE users SET is_banned = TRUE, banned_at = NOW() WHERE id = ?', userId);
+    
+    logAudit(req.adminUser.id, 'ban_user', userId, reason || 'No reason provided');
+    
+    const userSockets = req.app.get('userSockets');
+    const targetSocketId = userSockets?.get(userId);
+    
+    if (targetSocketId) {
+      const io = req.app.get('io');
+      io.to(targetSocketId).emit('banned', { reason: reason || 'Your account has been suspended' });
+      userSockets.delete(userId);
+    }
+    
+    res.json({ success: true, message: 'User banned successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to ban user' });
   }
-  
-  if (user.role === 'admin' || user.role === 'super_admin') {
-    return res.status(403).json({ error: 'Cannot ban admin' });
-  }
-  
-  run('UPDATE users SET is_banned = 1, banned_at = ? WHERE id = ?', new Date().toISOString(), userId);
-  
-  logAudit(req.adminUser.id, 'ban_user', userId, reason || 'No reason provided');
-  
-  const userSockets = req.app.get('userSockets');
-  const targetSocketId = userSockets?.get(userId);
-  
-  if (targetSocketId) {
-    const io = req.app.get('io');
-    io.to(targetSocketId).emit('banned', { reason: reason || 'Your account has been suspended' });
-    userSockets.delete(userId);
-  }
-  
-  res.json({ success: true, message: 'User banned successfully' });
 };
 
-export const unbanUser = (req, res) => {
+export const unbanUser = async (req, res) => {
   const { userId } = req.body;
   
   if (!userId) {
     return res.status(400).json({ error: 'User ID required' });
   }
   
-  run('UPDATE users SET is_banned = 0, banned_at = NULL WHERE id = ?', userId);
-  
-  logAudit(req.adminUser.id, 'unban_user', userId, 'User unbanned');
-  
-  res.json({ success: true, message: 'User unbanned successfully' });
+  try {
+    await db.run('UPDATE users SET is_banned = FALSE, banned_at = NULL WHERE id = ?', userId);
+    logAudit(req.adminUser.id, 'unban_user', userId, 'User unbanned');
+    res.json({ success: true, message: 'User unbanned successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to unban user' });
+  }
 };
 
-export const getAudit = (req, res) => {
+export const getAudit = async (req, res) => {
   const { limit = 50, adminId, action, startDate, endDate } = req.query;
 
   let query = `
@@ -133,86 +148,93 @@ export const getAudit = (req, res) => {
     WHERE 1=1
   `;
   const params = [];
+  let paramIndex = 1;
 
   if (adminId) {
-    query += ' AND a.admin_id = ?';
+    query += ` AND a.admin_id = $${paramIndex++}`;
     params.push(adminId);
   }
 
   if (action) {
-    query += ' AND a.action = ?';
+    query += ` AND a.action = $${paramIndex++}`;
     params.push(action);
   }
 
   if (startDate) {
-    query += ' AND a.timestamp >= ?';
+    query += ` AND a.timestamp >= $${paramIndex++}`;
     params.push(startDate);
   }
 
   if (endDate) {
-    query += ' AND a.timestamp <= ?';
+    query += ` AND a.timestamp <= $${paramIndex++}`;
     params.push(endDate);
   }
 
-  query += ' ORDER BY a.timestamp DESC LIMIT ?';
+  query += ` ORDER BY a.timestamp DESC LIMIT $${paramIndex++}`;
   params.push(parseInt(limit));
 
-  const logs = all(query, ...params);
-  res.json(logs);
+  try {
+    const logs = await db.all(query, ...params);
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
 };
 
-export const getRisks = (req, res) => {
-  const risks = [];
-  const recommendations = [];
+export const getRisks = async (req, res) => {
+  try {
+    const risks = [];
+    const recommendations = [];
 
-  const bannedUsers = get('SELECT COUNT(*) as count FROM users WHERE is_banned = 1');
-  if (bannedUsers.count > 0) {
-    risks.push({ level: 'info', message: `${bannedUsers.count} banned user(s) in system` });
-    recommendations.push({ action: 'review_banned_users', description: 'Review banned accounts for potential unbanning or data cleanup' });
+    const bannedUsers = await db.get('SELECT COUNT(*) as count FROM users WHERE is_banned = TRUE');
+    if (bannedUsers.count > 0) {
+      risks.push({ level: 'info', message: `${bannedUsers.count} banned user(s) in system` });
+      recommendations.push({ action: 'review_banned_users', description: 'Review banned accounts for potential unbanning or data cleanup' });
+    }
+
+    const activeConnections = req.app.get('userSockets')?.size || 0;
+    if (activeConnections === 0) {
+      risks.push({ level: 'warning', message: 'No active connections' });
+      recommendations.push({ action: 'check_server_status', description: 'Verify server is running and accessible' });
+    }
+
+    const inactiveUsers = await db.get(`
+      SELECT COUNT(*) as count FROM users
+      WHERE id NOT IN (SELECT DISTINCT sender_id FROM messages WHERE timestamp > NOW() - INTERVAL '24 hours')
+      AND id NOT IN (SELECT DISTINCT receiver_id FROM messages WHERE timestamp > NOW() - INTERVAL '24 hours')
+    `);
+
+    if (inactiveUsers.count > 5) {
+      risks.push({ level: 'warning', message: `${inactiveUsers.count} users inactive for 24h` });
+      recommendations.push({ action: 'engage_inactive_users', description: 'Consider sending notification or checking user retention' });
+    }
+
+    const metrics = getMetricsSummary();
+    if (metrics.failedCallsToday > 10) {
+      risks.push({ level: 'warning', message: `High failed call count: ${metrics.failedCallsToday}` });
+      recommendations.push({ action: 'investigate_call_failures', description: 'Check network connectivity, STUN servers, and WebRTC configuration' });
+    }
+
+    if (metrics.bannedAttempts > 5) {
+      risks.push({ level: 'warning', message: `High banned user connection attempts: ${metrics.bannedAttempts}` });
+      recommendations.push({ action: 'review_security', description: 'Consider implementing rate limiting or IP blocking' });
+    }
+
+    // Table status check for Postgres
+    const tableCheck = await db.all("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
+    const tableNames = tableCheck.map(t => t.table_name);
+    const requiredTables = ['users', 'messages', 'admin_audit_logs', 'call_history', 'blocked_users', 'message_reports'];
+    const missingTables = requiredTables.filter(t => !tableNames.includes(t));
+    if (missingTables.length > 0) {
+      risks.push({ level: 'critical', message: `Missing database tables: ${missingTables.join(', ')}` });
+      recommendations.push({ action: 'run_migrations', description: 'Execute database migrations to create missing tables' });
+    }
+
+    res.json({ risks, recommendations });
+  } catch (err) {
+    console.error('[ADMIN] Risks error:', err);
+    res.status(500).json({ error: 'Failed to fetch risks' });
   }
-
-  const activeConnections = req.app.get('userSockets')?.size || 0;
-  if (activeConnections === 0) {
-    risks.push({ level: 'warning', message: 'No active connections' });
-    recommendations.push({ action: 'check_server_status', description: 'Verify server is running and accessible' });
-  }
-
-  const inactiveUsers = get(`
-    SELECT COUNT(*) as count FROM users
-    WHERE id NOT IN (SELECT DISTINCT sender_id FROM messages WHERE timestamp > datetime('now', '-24 hours'))
-    AND id NOT IN (SELECT DISTINCT receiver_id FROM messages WHERE timestamp > datetime('now', '-24 hours'))
-  `);
-
-  if (inactiveUsers.count > 5) {
-    risks.push({ level: 'warning', message: `${inactiveUsers.count} users inactive for 24h` });
-    recommendations.push({ action: 'engage_inactive_users', description: 'Consider sending notification or checking user retention' });
-  }
-
-  const metrics = getMetricsSummary();
-  if (metrics.failedCallsToday > 10) {
-    risks.push({ level: 'warning', message: `High failed call count: ${metrics.failedCallsToday}` });
-    recommendations.push({ action: 'investigate_call_failures', description: 'Check network connectivity, STUN servers, and WebRTC configuration' });
-  }
-
-  if (metrics.bannedAttempts > 5) {
-    risks.push({ level: 'warning', message: `High banned user connection attempts: ${metrics.bannedAttempts}` });
-    recommendations.push({ action: 'review_security', description: 'Consider implementing rate limiting or IP blocking' });
-  }
-
-  // Table migrations status
-  const tables = all("SELECT name FROM sqlite_master WHERE type='table'");
-  const tableNames = tables.map(t => t.name);
-  const requiredTables = ['users', 'messages', 'admin_audit_logs', 'call_history', 'blocked_users', 'message_reports'];
-  const missingTables = requiredTables.filter(t => !tableNames.includes(t));
-  if (missingTables.length > 0) {
-    risks.push({ level: 'critical', message: `Missing database tables: ${missingTables.join(', ')}` });
-    recommendations.push({ action: 'run_migrations', description: 'Execute database migrations to create missing tables' });
-  }
-
-  res.json({
-    risks,
-    recommendations
-  });
 };
 
 export const getPermissions = (req, res) => {
@@ -221,35 +243,37 @@ export const getPermissions = (req, res) => {
   res.json({ role, permissions, allRoles: Object.values(USER_ROLES) });
 };
 
-export const updateUserRole = (req, res) => {
+export const updateUserRole = async (req, res) => {
   const { userId, newRole } = req.body;
   
   if (!userId || !newRole) {
     return res.status(400).json({ error: 'User ID and role required' });
   }
   
-  const user = get('SELECT * FROM users WHERE id = ?', userId);
-  
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+  try {
+    const user = await db.get('SELECT * FROM users WHERE id = ?', userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (user.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot modify super_admin role' });
+    }
+    
+    if (req.adminUser.role !== 'super_admin' && newRole === 'super_admin') {
+      return res.status(403).json({ error: 'Only super_admin can assign super_admin role' });
+    }
+    
+    await db.run('UPDATE users SET role = ? WHERE id = ?', newRole, userId);
+    logAudit(req.adminUser.id, 'role_change', userId, `Changed role from ${user.role} to ${newRole}`);
+    res.json({ success: true, message: 'Role updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update user role' });
   }
-  
-  if (user.role === 'super_admin') {
-    return res.status(403).json({ error: 'Cannot modify super_admin role' });
-  }
-  
-  if (req.adminUser.role !== 'super_admin' && newRole === 'super_admin') {
-    return res.status(403).json({ error: 'Only super_admin can assign super_admin role' });
-  }
-  
-  run('UPDATE users SET role = ? WHERE id = ?', newRole, userId);
-  
-  logAudit(req.adminUser.id, 'role_change', userId, `Changed role from ${user.role} to ${newRole}`);
-  
-  res.json({ success: true, message: 'Role updated successfully' });
 };
 
-export const changePassword = (req, res) => {
+export const changePassword = async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
   if (!currentPassword || !newPassword) {
@@ -260,54 +284,55 @@ export const changePassword = (req, res) => {
     return res.status(400).json({ error: 'New password must be at least 6 characters' });
   }
 
-  const admin = get('SELECT * FROM users WHERE id = ?', req.adminUser.id);
+  try {
+    const admin = await db.get('SELECT * FROM users WHERE id = ?', req.adminUser.id);
 
-  if (!admin || !bcrypt.compareSync(currentPassword, admin.password)) {
-    return res.status(401).json({ error: 'Current password is incorrect' });
+    if (!admin || !bcrypt.compareSync(currentPassword, admin.password_hash)) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hash = bcrypt.hashSync(newPassword, 12);
+    await db.run('UPDATE users SET password_hash = ? WHERE id = ?', hash, req.adminUser.id);
+
+    incrementTokenVersion(req.adminUser.id);
+    logAudit(req.adminUser.id, 'password_change', req.adminUser.id, 'Admin changed password');
+
+    const app = getApp();
+    const userSockets = app.get('userSockets');
+    const io = app.get('io');
+    const socketId = userSockets.get(req.adminUser.id);
+    if (socketId && io) {
+      io.to(socketId).emit('force-logout', { reason: 'Password changed. Please log in again.' });
+      userSockets.delete(req.adminUser.id);
+    }
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to change password' });
   }
-
-  const hash = bcrypt.hashSync(newPassword, 12);
-  run('UPDATE users SET password = ? WHERE id = ?', hash, req.adminUser.id);
-
-  // Invalidate all sessions for this admin
-  incrementTokenVersion(req.adminUser.id);
-  logAudit(req.adminUser.id, 'password_change', req.adminUser.id, 'Admin changed password');
-
-  // Disconnect all sockets for this admin
-  const app = getApp();
-  const userSockets = app.get('userSockets');
-  const io = app.get('io');
-  const socketId = userSockets.get(req.adminUser.id);
-  if (socketId && io) {
-    io.to(socketId).emit('force-logout', { reason: 'Password changed. Please log in again.' });
-    userSockets.delete(req.adminUser.id);
-  }
-
-  res.json({ success: true, message: 'Password changed successfully' });
 };
 
-export const getMigrationStatus = (req, res) => {
-  const migrations = [];
-  
-  const tables = all("SELECT name FROM sqlite_master WHERE type='table'");
-  const tableNames = tables.map(t => t.name);
-  
-  migrations.push({ name: 'users table', exists: tableNames.includes('users') });
-  migrations.push({ name: 'messages table', exists: tableNames.includes('messages') });
-  migrations.push({ name: 'admin_audit_logs table', exists: tableNames.includes('admin_audit_logs') });
-  
-  if (tableNames.includes('users')) {
-    const userCols = all('PRAGMA table_info(users)');
-    migrations.push({ name: 'users.role column', exists: userCols.some(c => c.name === 'role') });
-    migrations.push({ name: 'users.is_banned column', exists: userCols.some(c => c.name === 'is_banned') });
+export const getMigrationStatus = async (req, res) => {
+  try {
+    const migrations = [];
+    const tableCheck = await db.all("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
+    const tableNames = tableCheck.map(t => t.table_name);
+    
+    migrations.push({ name: 'users table', exists: tableNames.includes('users') });
+    migrations.push({ name: 'messages table', exists: tableNames.includes('messages') });
+    migrations.push({ name: 'admin_audit_logs table', exists: tableNames.includes('admin_audit_logs') });
+    
+    if (tableNames.includes('users')) {
+      const userCols = await db.all("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'");
+      const colNames = userCols.map(c => c.column_name);
+      migrations.push({ name: 'users.role column', exists: colNames.includes('role') });
+      migrations.push({ name: 'users.is_banned column', exists: colNames.includes('is_banned') });
+    }
+    
+    res.json(migrations);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch migration status' });
   }
-  
-  if (tableNames.includes('messages')) {
-    const msgCols = all('PRAGMA table_info(messages)');
-    migrations.push({ name: 'messages.is_read column', exists: msgCols.some(c => c.name === 'is_read') });
-  }
-  
-  res.json(migrations);
 };
 
 export const exportData = (req, res) => {
@@ -375,38 +400,36 @@ export const exportData = (req, res) => {
   logAudit(req.adminUser.id, 'data_export', null, `Exported data in ${format} format`);
 };
 
-export const getMessageHealth = (req, res) => {
+export const getMessageHealth = async (req, res) => {
   try {
-    const totalMessages = get('SELECT COUNT(*) as count FROM messages').count;
-    const messagesToday = get("SELECT COUNT(*) as count FROM messages WHERE DATE(timestamp) = DATE('now')").count;
-    const messagesLast7Days = get("SELECT COUNT(*) as count FROM messages WHERE timestamp > DATETIME('now', '-7 days')").count;
-    const reportedMessages = get('SELECT COUNT(*) as count FROM message_reports').count;
+    const totalMessages = (await db.get('SELECT COUNT(*) as count FROM messages')).count;
+    const messagesToday = (await db.get("SELECT COUNT(*) as count FROM messages WHERE timestamp::date = CURRENT_DATE")).count;
+    const messagesLast7Days = (await db.get("SELECT COUNT(*) as count FROM messages WHERE timestamp > NOW() - INTERVAL '7 days'")).count;
+    const reportedMessages = (await db.get('SELECT COUNT(*) as count FROM message_reports')).count;
 
-    // Blocked message risk: messages involving banned users
-    const blockedMessageRisk = get(`
+    const blockedMessageRisk = (await db.get(`
       SELECT COUNT(*) as count FROM messages
-      WHERE sender_id IN (SELECT id FROM users WHERE is_banned = 1)
-      OR receiver_id IN (SELECT id FROM users WHERE is_banned = 1)
-    `).count;
+      WHERE sender_id IN (SELECT id FROM users WHERE is_banned = TRUE)
+      OR receiver_id IN (SELECT id FROM users WHERE is_banned = TRUE)
+    `)).count;
 
-    const persistenceStatus = 'healthy'; // Since we're querying successfully
-    const latestMessage = get('SELECT MAX(timestamp) as latest FROM messages');
+    const persistenceStatus = 'healthy';
+    const latestMessage = await db.get('SELECT MAX(timestamp) as latest FROM messages');
     const latestMessageAt = latestMessage.latest;
 
-    // Health score: lower reported messages ratio is better
-    const healthScore = totalMessages > 0 ? Math.max(0, 100 - Math.round((reportedMessages / totalMessages) * 100)) : 100;
+    const healthScore = totalMessages > 0 ? Math.max(0, 100 - Math.round((parseInt(reportedMessages) / parseInt(totalMessages)) * 100)) : 100;
 
     const warnings = [];
-    if (blockedMessageRisk > 0) {
+    if (parseInt(blockedMessageRisk) > 0) {
       warnings.push(`${blockedMessageRisk} messages involve banned users`);
     }
 
     res.json({
-      totalMessages,
-      messagesToday,
-      messagesLast7Days,
-      reportedMessages,
-      blockedMessageRisk,
+      totalMessages: parseInt(totalMessages),
+      messagesToday: parseInt(messagesToday),
+      messagesLast7Days: parseInt(messagesLast7Days),
+      reportedMessages: parseInt(reportedMessages),
+      blockedMessageRisk: parseInt(blockedMessageRisk),
       persistenceStatus,
       latestMessageAt,
       healthScore,
@@ -417,47 +440,49 @@ export const getMessageHealth = (req, res) => {
   }
 };
 
-export const getCallHealth = (req, res) => {
+export const getCallHealth = async (req, res) => {
   try {
-    const totalCalls = get('SELECT COUNT(*) as count FROM call_history')?.count || 0;
-    const callsToday = get("SELECT COUNT(*) as count FROM call_history WHERE DATE(started_at) = DATE('now')")?.count || 0;
-    const callsLast7Days = get("SELECT COUNT(*) as count FROM call_history WHERE started_at > DATETIME('now', '-7 days')")?.count || 0;
+    const totalCallsResult = await db.get('SELECT COUNT(*) as count FROM call_history');
+    const totalCalls = totalCallsResult?.count || 0;
+    
+    const callsTodayResult = await db.get("SELECT COUNT(*) as count FROM call_history WHERE started_at::date = CURRENT_DATE");
+    const callsToday = callsTodayResult?.count || 0;
+    
+    const callsLast7DaysResult = await db.get("SELECT COUNT(*) as count FROM call_history WHERE started_at > NOW() - INTERVAL '7 days'");
+    const callsLast7Days = callsLast7DaysResult?.count || 0;
 
-    // Failed calls from audit logs
-    const failedCallsToday = get("SELECT COUNT(*) as count FROM admin_audit_logs WHERE action = 'call_failed' AND DATE(timestamp) = DATE('now')")?.count || 0;
+    const failedCallsTodayResult = await db.get("SELECT COUNT(*) as count FROM admin_audit_logs WHERE action = 'call_failed' AND timestamp::date = CURRENT_DATE");
+    const failedCallsToday = failedCallsTodayResult?.count || 0;
 
-    // Active calls from app state
     const callActivity = req.app.get('callActivity') || { activeCalls: 0 };
     const activeCalls = callActivity.activeCalls || 0;
 
-    // Average duration
     let averageCallDuration = 0;
-    const avgResult = get('SELECT AVG(duration) as avg FROM call_history WHERE duration IS NOT NULL AND duration > 0');
+    const avgResult = await db.get('SELECT AVG(duration) as avg FROM call_history WHERE duration IS NOT NULL AND duration > 0');
     if (avgResult && avgResult.avg !== null) {
       averageCallDuration = Math.round(avgResult.avg);
     }
 
-    const healthScore = totalCalls > 0 ? Math.max(0, 100 - Math.round((failedCallsToday / totalCalls) * 100)) : 100;
+    const healthScore = totalCalls > 0 ? Math.max(0, 100 - Math.round((parseInt(failedCallsToday) / parseInt(totalCalls)) * 100)) : 100;
 
     const warnings = [];
-    if (averageCallDuration === 0 && totalCalls > 0) {
+    if (parseInt(averageCallDuration) === 0 && parseInt(totalCalls) > 0) {
       warnings.push('Call duration tracking is empty');
     }
-    if (failedCallsToday > totalCalls * 0.1 && totalCalls > 0) {
-      warnings.push('High failed call rate detected today');
-    }
+
+    const lastCall = await db.get('SELECT started_at FROM call_history ORDER BY started_at DESC LIMIT 1');
 
     res.json({
       ok: true,
-      totalCalls,
-      callsToday,
-      callsLast7Days,
-      failedCallsToday,
+      totalCalls: parseInt(totalCalls),
+      callsToday: parseInt(callsToday),
+      callsLast7Days: parseInt(callsLast7Days),
+      failedCallsToday: parseInt(failedCallsToday),
       activeCalls,
       averageCallDuration,
       healthScore,
       health: healthScore > 80 ? 'stable' : (healthScore > 50 ? 'warning' : 'critical'),
-      lastCallAt: get('SELECT started_at FROM call_history ORDER BY started_at DESC LIMIT 1')?.started_at || null,
+      lastCallAt: lastCall?.started_at || null,
       warnings
     });
   } catch (err) {

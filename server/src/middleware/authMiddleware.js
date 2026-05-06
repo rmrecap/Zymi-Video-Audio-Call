@@ -1,8 +1,8 @@
-import { get } from '../db/database.js';
+import { db } from '../db/db_provider.js';
 import { verifyToken } from '../services/sessionService.js';
 import { USER_ROLES, ROLE_PERMISSIONS } from '../../shared/socketEvents.js';
 
-export const requireAuth = (req, res, next) => {
+export const requireAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -18,37 +18,42 @@ export const requireAuth = (req, res, next) => {
 
   const userId = decoded.userId;
 
-  // Fetch user with settings
-  const user = get('SELECT id, username, role, is_banned, token_version, notification_sound, call_ringtone, theme, online_visibility, read_receipt FROM users WHERE id = ?', userId);
-  if (!user) {
-    return res.status(401).json({ error: 'User not found' });
-  }
-
-  if (user.is_banned) {
-    return res.status(403).json({ error: 'Account suspended' });
-  }
-
-  if (decoded.tokenVersion !== user.token_version) {
-    return res.status(401).json({ error: 'Session invalidated (password changed)' });
-  }
-
-  req.user = {
-    id: user.id,
-    username: user.username,
-    role: user.role,
-    tokenVersion: user.token_version,
-    settings: {
-      notificationSound: !!user.notification_sound,
-      callRingtone: !!user.call_ringtone,
-      theme: user.theme || 'dark',
-      onlineVisibility: !!user.online_visibility,
-      readReceipt: !!user.read_receipt
+  try {
+    // Fetch user with settings
+    const user = await db.get('SELECT id, username, role, is_banned, token_version, notification_sound, call_ringtone, theme, online_visibility, read_receipt FROM users WHERE id = ?', userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
     }
-  };
-  next();
+
+    if (user.is_banned) {
+      return res.status(403).json({ error: 'Account suspended' });
+    }
+
+    if (decoded.tokenVersion !== user.token_version) {
+      return res.status(401).json({ error: 'Session invalidated (password changed)' });
+    }
+
+    req.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      tokenVersion: user.token_version,
+      settings: {
+        notificationSound: !!user.notification_sound,
+        callRingtone: !!user.call_ringtone,
+        theme: user.theme || 'dark',
+        onlineVisibility: !!user.online_visibility,
+        readReceipt: !!user.read_receipt
+      }
+    };
+    next();
+  } catch (err) {
+    console.error('[AUTH_MIDDLEWARE] Error:', err);
+    res.status(500).json({ error: 'Internal server error during authentication' });
+  }
 };
 
-export const requireAdmin = (req, res, next) => {
+export const requireAdmin = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -63,26 +68,31 @@ export const requireAdmin = (req, res, next) => {
   }
 
   const userId = decoded.userId;
-  const user = get('SELECT id, username, role, is_banned, token_version FROM users WHERE id = ?', userId);
+  try {
+    const user = await db.get('SELECT id, username, role, is_banned, token_version FROM users WHERE id = ?', userId);
 
-  if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
-    return res.status(403).json({ error: 'Admin access required' });
+    if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (user.is_banned) {
+      return res.status(403).json({ error: 'Account suspended' });
+    }
+
+    if (decoded.tokenVersion !== user.token_version) {
+      return res.status(401).json({ error: 'Session invalidated (password changed)' });
+    }
+
+    req.adminUser = {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    };
+    next();
+  } catch (err) {
+    console.error('[ADMIN_MIDDLEWARE] Error:', err);
+    res.status(500).json({ error: 'Internal server error during admin validation' });
   }
-
-  if (user.is_banned) {
-    return res.status(403).json({ error: 'Account suspended' });
-  }
-
-  if (decoded.tokenVersion !== user.token_version) {
-    return res.status(401).json({ error: 'Session invalidated (password changed)' });
-  }
-
-  req.adminUser = {
-    id: user.id,
-    username: user.username,
-    role: user.role
-  };
-  next();
 };
 
 export const requireRole = (...allowedRoles) => {
@@ -127,9 +137,13 @@ export const getUserPermissions = (role) => {
   return ROLE_PERMISSIONS[role] || [];
 };
 
-export const isUserBanned = (userId) => {
-  const user = get('SELECT is_banned FROM users WHERE id = ?', userId);
-  return user ? !!user.is_banned : false;
+export const isUserBanned = async (userId) => {
+  try {
+    const user = await db.get('SELECT is_banned FROM users WHERE id = ?', userId);
+    return user ? !!user.is_banned : false;
+  } catch (err) {
+    return false;
+  }
 };
 
 export { USER_ROLES, ROLE_PERMISSIONS };

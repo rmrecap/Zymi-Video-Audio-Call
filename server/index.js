@@ -6,14 +6,18 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import fileUpload from 'express-fileupload';
 
+// Load env vars first
 dotenv.config();
 
 import { config, isProduction } from './src/config/env.js';
-
 import { initDatabase } from './src/db/database.js';
-initDatabase();
+import { initPostgres } from './src/db/postgres.js';
+import { runMigrations } from './src/db/migrations.js';
+import { initAdminSeed } from './src/config/adminSeed.js';
+import { seedDemoUsers } from './src/db/seed_demo_users.js';
 
-// Initialize PostgreSQL early if configured, so seeding can use it
+// Initialize DBs
+initDatabase(); // SQLite fallback
 if (config.databaseUrl) {
   try {
     initPostgres();
@@ -23,42 +27,33 @@ if (config.databaseUrl) {
   }
 }
 
-import { runMigrations } from './src/db/migrations.js';
+// Run migrations and seeds
 runMigrations();
-
-import { initAdminSeed } from './src/config/adminSeed.js';
 await initAdminSeed();
-
-import { seedDemoUsers } from './src/db/seed_demo_users.js';
 await seedDemoUsers();
 
+// Other services
 import { createBlockTable } from './src/services/blockService.js';
-createBlockTable();
-
 import { createReportsTable } from './src/services/reportService.js';
-createReportsTable();
-
 import { createCallHistoryTable } from './src/services/callHistoryService.js';
-createCallHistoryTable();
-
 import { initCallState } from './src/services/callStateService.js';
-initCallState();
-
 import { initMetrics } from './src/services/metricsService.js';
-initMetrics();
 import { logAudit } from './src/services/auditService.js';
 
+createBlockTable();
+createReportsTable();
+createCallHistoryTable();
+initCallState();
+initMetrics();
+
+// Routes
 import healthRoutes from './src/routes/healthRoutes.js';
 import clientErrorRoutes from './src/routes/clientErrorRoutes.js';
 import { attachAuthMiddleware } from './src/socket/socketAuthGuard.js';
-import { initRedis, getRedisAdapter } from './src/socket/redisAdapter.js';
-import { initPostgres, isPostgresReady } from './src/db/postgres.js';
-import { authRateLimit, exportRateLimit } from './src/middleware/rateLimit.js';
-
+import { initRedis } from './src/socket/redisAdapter.js';
+import { authRateLimit } from './src/middleware/rateLimit.js';
 import { setupCallSocket } from './src/socket/callSocket.js';
 import { setupChatSocket } from './src/socket/chatSocket.js';
-import { isBlocked } from './src/routes/blockRoutes.js';
-
 import { register, login, adminLogin } from './src/routes/authRoutes.js';
 import { getUsers, getMessages, searchMessages, getUnread, markAsRead } from './src/routes/messageRoutes.js';
 import { editMessage, getMessageEdits } from './src/routes/messageEditRoutes.js';
@@ -81,17 +76,11 @@ import authRouter from './src/routes/authRoutes.js';
 import otpRoutes from './src/routes/otpRoutes.js';
 import emailSettingsRoutes from './src/routes/emailSettingsRoutes.js';
 import projectBrainRoutes from './src/routes/projectBrainRoutes.js';
-
-// Global error handlers for server stability
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('[SERVER] Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('[SERVER] Uncaught Exception:', error);
-  // Do NOT exit — allow the server to continue running
-  // Only critical unrecoverable errors should trigger a restart via PM2/Docker
-});
+import messageRoutes from './src/routes/messageRoutes.js';
+import notificationRoutes from './src/routes/notificationRoutes.js';
+import mediaRoutes from './src/routes/mediaRoutes.js';
+import turnRoutes from './src/routes/turnRoutes.js';
+import connectivityRoutes from './src/routes/connectivityRoutes.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -104,17 +93,9 @@ const io = new Server(httpServer, {
     methods: ['GET', 'POST'],
     credentials: true
   },
-  cookie: true, // Enable cookies for sticky sessions with load balancers
+  cookie: true,
   pingTimeout: 60000,
   pingInterval: 25000
-});
-
-io.on('error', (error) => {
-  console.error('[SOCKET.IO] Server error:', error);
-});
-
-io.engine.on('connection-error', (err) => {
-  console.error('[SOCKET.IO] Connection error:', err);
 });
 
 const allowedOrigins = [corsOrigin, 'http://127.0.0.1:5175'];
@@ -134,22 +115,13 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Debug middleware
-app.use((req, res, next) => {
-  if (req.method === 'POST' && req.originalUrl === '/api/register') {
-    console.log('[DEBUG] Body:', JSON.stringify(req.body));
-  }
-  next();
-});
-app.use(express.urlencoded({ extended: true, strict: false }));
-
 app.use(fileUpload({
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+  limits: { fileSize: 2 * 1024 * 1024 },
   useTempFiles: true,
   tempFileDir: '/tmp/'
 }));
 
-// Public routes with rate limiting
+// Routes mounting
 app.post('/api/register', register);
 app.post('/api/login', authRateLimit(), login);
 app.post('/api/admin/login', authRateLimit(), (req, res) => {
@@ -157,7 +129,6 @@ app.post('/api/admin/login', authRateLimit(), (req, res) => {
   logAudit(null, 'admin_login_attempt', null, `Login attempt: ${req.body.username}`);
 });
 
-// Protected user routes
 app.get('/api/users', requireAuth, getUsers);
 app.get('/api/messages/:userId/:otherId', requireAuth, getMessages);
 app.get('/api/messages/search/:userId', requireAuth, searchMessages);
@@ -194,44 +165,20 @@ app.delete('/api/upload/avatar', requireAuth, deleteUserAvatar);
 app.post('/api/messages/upload', requireAuth, uploadMessageFile);
 app.get('/uploads/messages/:filename', getMessageFile);
 
-// Nearby Discovery Routes
 app.use('/api/nearby', nearbyRoutes);
-
-// User Lookup Routes
 app.use('/api/users', userLookupRoutes);
-
-// Phase 57: Messaging & Notifications
-import messageRoutes from './src/routes/messageRoutes.js';
-import notificationRoutes from './src/routes/notificationRoutes.js';
-import mediaRoutes from './src/routes/mediaRoutes.js';
-import turnRoutes from './src/routes/turnRoutes.js';
-import connectivityRoutes from './src/routes/connectivityRoutes.js';
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/turn', turnRoutes);
 app.use('/api/connectivity', connectivityRoutes);
-
-// Phase 54: Advanced Auth & OTP Routes
 app.use('/api/auth', authRouter);
 app.use('/api/otp', otpRoutes);
-app.get('/verify/phone/:token', (req, res) => {
-  // Redirect to the API handler or just import it
-  res.redirect(`/api/otp/phone/verify/${req.params.token}`);
-});
 app.use('/api/admin', emailSettingsRoutes);
 app.use('/api/admin/project-brain', projectBrainRoutes);
-
-// Health check routes
 app.use(healthRoutes);
-
-// Client error logging routes
 app.use(clientErrorRoutes);
-
-// ZRCS Ad Control & Settings
 app.use('/api', adControlRoutes); 
-console.log('[ZRCS] Routes mounted at /api (v1/ad-settings & admin/ad-control)');
-
 app.use('/api/admin', adminFeatureRoutes);
 app.use('/api', adminFeatureRoutes);
 
@@ -262,45 +209,31 @@ app.set('callActivity', callActivity);
 app.set('io', io);
 app.set('serverStartTime', serverStartTime);
 
-
-
-// Initialize Redis adapter for Socket.io scaling
+// Socket services
 const redisResult = await initRedis(io);
 if (redisResult.adapter) {
   io.adapter(redisResult.adapter);
-  console.log('[REDIS] Socket.io Redis adapter attached');
-} else if (config.redisUrl) {
-  console.warn('[REDIS] Running without Redis adapter (single-instance mode)');
-} else {
-  console.log('[REDIS] REDIS_URL not configured, running in single-instance mode');
 }
 
-// Attach Socket.io JWT authentication
 if (isProduction()) {
   attachAuthMiddleware(io);
-  console.log('[SOCKET_AUTH] JWT authentication enabled');
 }
 
-// Socket setup with modular handlers
 setupCallSocket(io, userSockets, callActivity);
 setupChatSocket(io, userSockets);
 
 const PORT = config.port || 5000;
-
 const startServer = (port) => {
-  httpServer.listen(port, () => {
-    console.log(`ZYMI server running on http://localhost:${port}`);
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.log(`ZYMI server running on port ${port} (0.0.0.0)`);
   }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.log(`Port ${port} is busy, trying ${port + 1}...`);
       startServer(port + 1);
     } else {
-      console.error('Server error:', err);
       process.exit(1);
     }
   });
 };
 
 startServer(PORT);
-
 export const getApp = () => app;

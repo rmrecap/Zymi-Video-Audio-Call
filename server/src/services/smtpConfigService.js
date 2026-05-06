@@ -1,8 +1,8 @@
-import { get, run } from '../db/database.js';
+import { db } from '../db/db_provider.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
 
-export const getEmailSettings = () => {
-  const settings = get('SELECT * FROM email_settings WHERE id = 1');
+export const getEmailSettings = async () => {
+  const settings = await db.get('SELECT * FROM email_settings WHERE id = 1');
   if (settings) {
     return {
       ...settings,
@@ -13,15 +13,30 @@ export const getEmailSettings = () => {
   return null;
 };
 
-export const updateEmailSettings = (data) => {
+export const updateEmailSettings = async (data) => {
   const { provider, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, gmail_user, gmail_app_password } = data;
   
-  const current = getEmailSettings();
+  const current = await getEmailSettings();
   
-  const encryptedSmtpPass = smtp_pass ? encrypt(smtp_pass) : current?.smtp_pass ? encrypt(current.smtp_pass) : null;
-  const encryptedGmailPass = gmail_app_password ? encrypt(gmail_app_password) : current?.gmail_app_password ? encrypt(current.gmail_app_password) : null;
+  let encryptedSmtpPass;
+  if (smtp_pass && smtp_pass.trim() !== '') {
+    encryptedSmtpPass = encrypt(smtp_pass);
+  } else if (current?.smtp_pass) {
+    encryptedSmtpPass = current.smtp_pass;
+  } else {
+    encryptedSmtpPass = null;
+  }
+  
+  let encryptedGmailPass;
+  if (gmail_app_password && gmail_app_password.trim() !== '') {
+    encryptedGmailPass = encrypt(gmail_app_password);
+  } else if (current?.gmail_app_password) {
+    encryptedGmailPass = current.gmail_app_password;
+  } else {
+    encryptedGmailPass = null;
+  }
 
-  run(`
+  const result = await db.run(`
     UPDATE email_settings SET 
       provider = ?,
       smtp_host = ?,
@@ -43,6 +58,10 @@ export const updateEmailSettings = (data) => {
   gmail_user || null,
   encryptedGmailPass
   );
+
+  if (!result || result.changes === 0) {
+    throw new Error('Failed to update email settings - row may not exist');
+  }
   
-  return getEmailSettings();
+  return await getEmailSettings();
 };

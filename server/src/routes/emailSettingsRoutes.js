@@ -6,23 +6,26 @@ import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 
-router.get('/email-settings', requireAdmin, (req, res) => {
-  const settings = getEmailSettings();
-  if (settings) {
-    // Don't send passwords to frontend
-    const safeSettings = { ...settings };
-    delete safeSettings.smtp_pass;
-    delete safeSettings.gmail_app_password;
-    res.json(safeSettings);
-  } else {
-    res.status(404).json({ error: 'Settings not found' });
+router.get('/email-settings', requireAdmin, async (req, res) => {
+  try {
+    const settings = await getEmailSettings();
+    if (settings) {
+      const safeSettings = { ...settings };
+      delete safeSettings.smtp_pass;
+      delete safeSettings.gmail_app_password;
+      res.json(safeSettings);
+    } else {
+      res.status(404).json({ error: 'Settings not found' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/email-settings', requireAdmin, (req, res) => {
+router.post('/email-settings', requireAdmin, async (req, res) => {
   try {
-    const settings = updateEmailSettings(req.body);
-    logAudit(req.user.id, 'email_settings_updated', null, `Email provider changed to ${req.body.provider}`);
+    await updateEmailSettings(req.body);
+    logAudit(req.adminUser.id, 'email_settings_updated', null, `Email provider changed to ${req.body.provider}`).catch(console.error);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

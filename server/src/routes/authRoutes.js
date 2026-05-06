@@ -35,32 +35,53 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  const { username, password } = req.body; // username can be email or username
+  const { username, password } = req.body;
+  console.log(`[AUTH] Login attempt for: ${username}`);
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Credentials and password required' });
   }
 
-  const user = await db.get('SELECT * FROM users WHERE username = ? OR email = ?', username, username);
+  try {
+    console.log('[AUTH] Querying database for user...');
+    const user = await db.get('SELECT * FROM users WHERE username = ? OR email = ?', username, username);
+    
+    if (!user) {
+      console.log('[AUTH] User not found');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    console.log('[AUTH] User found, verifying password...');
+    if (!bcrypt.compareSync(password, user.password_hash)) {
+      console.log('[AUTH] Password mismatch');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (user.is_banned) {
+      console.log('[AUTH] User is banned');
+      return res.status(403).json({ error: 'Account suspended' });
+    }
+
+    console.log('[AUTH] Login successful, creating token...');
+    try {
+      await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', user.id);
+    } catch (updateErr) {
+      console.warn('[AUTH] Could not update last_login_at (column might be missing):', updateErr.message);
+    }
+
+    const token = createToken(user);
+    console.log('[AUTH] Token created, sending response');
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      token
+    });
+  } catch (err) {
+    console.error('[AUTH] Login error:', err);
+    res.status(500).json({ error: 'Internal server error during login' });
   }
-
-  if (user.is_banned) {
-    return res.status(403).json({ error: 'Account suspended' });
-  }
-
-  await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', user.id);
-
-  const token = createToken(user);
-  res.json({
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    role: user.role,
-    token
-  });
 };
 
 export const logout = async (req, res) => {

@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import { getEmailSettings } from './smtpConfigService.js';
 
 export const sendOTPEmail = async (email, otp) => {
-  const settings = getEmailSettings();
+  const settings = await getEmailSettings();
   if (!settings) {
     throw new Error('Email settings not configured');
   }
