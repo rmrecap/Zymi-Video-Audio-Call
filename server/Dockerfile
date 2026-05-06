@@ -1,26 +1,24 @@
 FROM node:20-alpine
 
-WORKDIR /app
-
 RUN apk add --no-cache dumb-init
 
-COPY package*.json ./
+WORKDIR /app
+
+RUN mkdir -p /app/data && \
+    addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 -G nodejs && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
+
+COPY --chown=nodejs:nodejs package*.json ./
 
 RUN npm ci --only=production
 
-COPY src/ ./src/
-COPY migrations/ ./migrations/
-COPY shared/ ./shared/
-COPY index.js ./
-
-RUN mkdir -p /app/data
-
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 -G nodejs
-
-RUN chown -R nodejs:nodejs /app
-
-USER nodejs
+COPY --chown=nodejs:nodejs src/ ./src/
+COPY --chown=nodejs:nodejs migrations/ ./migrations/
+COPY --chown=nodejs:nodejs shared/ ./shared/
+COPY --chown=nodejs:nodejs index.js ./
 
 EXPOSE 5000
 

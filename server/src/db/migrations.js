@@ -20,7 +20,7 @@ export const runMigrations = () => {
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
         role TEXT DEFAULT 'user',
         is_banned INTEGER DEFAULT 0,
         banned_at DATETIME
@@ -113,6 +113,10 @@ export const runMigrations = () => {
     if (!columnExists('users', 'status_text')) {
       exec("ALTER TABLE users ADD COLUMN status_text TEXT");
       console.log('[MIGRATION] Added status_text column to users');
+    }
+    if (!columnExists('users', 'password_hash') && columnExists('users', 'password')) {
+      exec("ALTER TABLE users RENAME COLUMN password TO password_hash");
+      console.log('[MIGRATION] Renamed password column to password_hash in users');
     }
   
   if (!tableExists('messages')) {

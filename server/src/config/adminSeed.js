@@ -4,7 +4,7 @@ import { seedSuperAdmin, checkSuperAdminExists } from '../db/seedAdmin.js';
 dotenv.config();
 
 export const initAdminSeed = async () => {
-  const existing = checkSuperAdminExists();
+  const existing = await checkSuperAdminExists();
   
   if (!existing) {
     console.log('[ADMIN_SEED] No super_admin found, attempting to seed...');

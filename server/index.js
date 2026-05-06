@@ -13,14 +13,24 @@ import { config, isProduction } from './src/config/env.js';
 import { initDatabase } from './src/db/database.js';
 initDatabase();
 
+// Initialize PostgreSQL early if configured, so seeding can use it
+if (config.databaseUrl) {
+  try {
+    initPostgres();
+    console.log('[DB] PostgreSQL connection pool initialized');
+  } catch (err) {
+    console.error('[DB] PostgreSQL initialization failed:', err.message);
+  }
+}
+
 import { runMigrations } from './src/db/migrations.js';
 runMigrations();
 
 import { initAdminSeed } from './src/config/adminSeed.js';
-initAdminSeed();
+await initAdminSeed();
 
 import { seedDemoUsers } from './src/db/seed_demo_users.js';
-seedDemoUsers();
+await seedDemoUsers();
 
 import { createBlockTable } from './src/services/blockService.js';
 createBlockTable();
@@ -252,15 +262,7 @@ app.set('callActivity', callActivity);
 app.set('io', io);
 app.set('serverStartTime', serverStartTime);
 
-// Initialize PostgreSQL if configured
-if (config.databaseUrl) {
-  try {
-    initPostgres();
-    console.log('[DB] PostgreSQL connection pool initialized');
-  } catch (err) {
-    console.error('[DB] PostgreSQL initialization failed:', err.message);
-  }
-}
+
 
 // Initialize Redis adapter for Socket.io scaling
 const redisResult = await initRedis(io);
