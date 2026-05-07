@@ -1,6 +1,8 @@
 import express from 'express';
 import * as featureFlagService from '../services/featureFlagService.js';
 import { requireAuth, requireAdmin } from '../middleware/authMiddleware.js';
+import { get, run, all } from '../db/postgres.js';
+import { logAudit } from '../services/auditService.js';
 
 const router = express.Router();
 
@@ -36,7 +38,7 @@ router.get('/features/audit-logs', requireAuth, requireAdmin, async (req, res) =
 router.post('/features/simulate', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { featureKey, userId, countryCode, cityName } = req.body;
-    const result = featureFlagService.evaluateFeatureAccess({
+    const result = await featureFlagService.evaluateFeatureAccess({
       featureKey,
       userId: userId ? parseInt(userId) : null,
       countryCode,
@@ -94,8 +96,7 @@ router.post('/features/user-rules', requireAuth, requireAdmin, async (req, res) 
 
 router.get('/features/nearby-settings', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { get } = await import('../db/database.js');
-    const settings = get('SELECT * FROM nearby_global_settings WHERE id = 1');
+    const settings = await get('SELECT * FROM nearby_global_settings WHERE id = 1');
     res.json(settings);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -105,16 +106,14 @@ router.get('/features/nearby-settings', requireAuth, requireAdmin, async (req, r
 router.post('/features/nearby-settings', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { default_radius_km, report_threshold, approximate_only } = req.body;
-    const { exec } = await import('../db/database.js');
-    const { logAudit } = await import('../services/auditService.js');
 
-    exec(`
+    await run(`
       UPDATE nearby_global_settings 
-      SET default_radius_km = ?, report_threshold = ?, approximate_only = ?, updated_at = CURRENT_TIMESTAMP 
+      SET default_radius_km = $1, report_threshold = $2, approximate_only = $3, updated_at = CURRENT_TIMESTAMP 
       WHERE id = 1
-    `, default_radius_km, report_threshold, approximate_only);
+    `, [default_radius_km, report_threshold, approximate_only]);
 
-    logAudit(req.adminUser.id, 'UPDATE_NEARBY_SETTINGS', null, JSON.stringify({
+    await logAudit(req.adminUser.id, 'UPDATE_NEARBY_SETTINGS', null, JSON.stringify({
       default_radius_km,
       report_threshold,
       approximate_only
@@ -131,11 +130,9 @@ router.post('/features/check-access', requireAuth, async (req, res) => {
   try {
     const { featureKey } = req.body;
     
-    // Fetch user location from DB
-    const { get } = await import('../db/database.js');
-    const userLocation = get('SELECT country, city FROM users WHERE id = ?', req.user.id);
+    const userLocation = await get('SELECT country_code as country, country_name as city FROM users WHERE id = $1', [req.user.id]);
     
-    const result = featureFlagService.evaluateFeatureAccess({
+    const result = await featureFlagService.evaluateFeatureAccess({
       featureKey,
       userId: req.user.id,
       countryCode: userLocation?.country,

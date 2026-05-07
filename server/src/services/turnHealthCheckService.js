@@ -1,10 +1,11 @@
 import net from 'net';
 import dgram from 'dgram';
 import tls from 'tls';
-import { all, run, get } from '../db/database.js';
+import crypto from 'crypto';
+import { all, run, get } from '../db/postgres.js';
 
 export const performHealthCheck = async () => {
-  const servers = all('SELECT * FROM turn_servers WHERE is_active = 1');
+  const servers = await all('SELECT * FROM turn_servers WHERE is_active = 1');
   const results = [];
 
   for (const server of servers) {
@@ -46,11 +47,11 @@ export const performHealthCheck = async () => {
     }
 
     // Save check results
-    run(`
+    await run(`
       INSERT INTO turn_health_checks (
         turn_server_id, status, udp_reachable, tcp_reachable, tls_reachable, latency_ms, error_message
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, server.id, health.status, health.udp ? 1 : 0, health.tcp ? 1 : 0, health.tls ? 1 : 0, health.latency, health.error);
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [server.id, health.status, health.udp ? 1 : 0, health.tcp ? 1 : 0, health.tls ? 1 : 0, health.latency, health.error]);
 
     results.push(health);
   }
@@ -125,23 +126,25 @@ const checkTlsReachability = (url) => {
       resolve(false);
     });
 
-    socket.timeout = setTimeout(() => {
+    const timeout = setTimeout(() => {
       socket.destroy();
       resolve(false);
     }, 2500);
+    
+    socket.on('close', () => clearTimeout(timeout));
   });
 };
 
-export const getLatestHealth = () => {
-  const servers = all('SELECT id, label FROM turn_servers WHERE is_active = 1');
+export const getLatestHealth = async () => {
+  const servers = await all('SELECT id, label FROM turn_servers WHERE is_active = 1');
   const healths = [];
 
   for (const server of servers) {
-    const latest = get(`
+    const latest = await get(`
       SELECT * FROM turn_health_checks 
-      WHERE turn_server_id = ? 
+      WHERE turn_server_id = $1 
       ORDER BY checked_at DESC LIMIT 1
-    `, server.id);
+    `, [server.id]);
     
     healths.push({
       server_id: server.id,
@@ -153,12 +156,10 @@ export const getLatestHealth = () => {
   return healths;
 };
 
-export const getHealthHistory = (serverId, limit = 50) => {
-  return all(`
+export const getHealthHistory = async (serverId, limit = 50) => {
+  return await all(`
     SELECT * FROM turn_health_checks 
-    WHERE turn_server_id = ? 
-    ORDER BY checked_at DESC LIMIT ?
-  `, serverId, limit);
+    WHERE turn_server_id = $1 
+    ORDER BY checked_at DESC LIMIT $2
+  `, [serverId, limit]);
 };
-
-import crypto from 'crypto';

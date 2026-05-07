@@ -1,4 +1,4 @@
-import { run } from '../db/database.js';
+import { run } from '../db/postgres.js';
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -32,9 +32,9 @@ export const enforceNoServerStorage = (req) => {
   }
 };
 
-export const cleanupExpiredMedia = () => {
+export const cleanupExpiredMedia = async () => {
   // Pending transfers older than 24 hours are expired
-  return run(
-    "UPDATE media_messages SET transfer_status = 'expired' WHERE transfer_status = 'pending' AND created_at < DATETIME('now', '-24 hours')"
+  return await run(
+    "UPDATE media_messages SET transfer_status = 'expired' WHERE transfer_status = 'pending' AND created_at < NOW() - interval '24 hours'"
   );
 };

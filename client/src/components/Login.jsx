@@ -5,6 +5,7 @@ import './Login.css';
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -16,10 +17,11 @@ function Login({ onLogin }) {
 
     try {
       const endpoint = isRegister ? '/api/register' : '/api/login';
+      const body = isRegister ? { username, email, password } : { username, password };
       const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
@@ -52,6 +54,21 @@ function Login({ onLogin }) {
               autoComplete="username"
             />
           </div>
+
+          {isRegister && (
+            <div className="input-group">
+              <input
+                id="login-email"
+                name="email"
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+          )}
 
           <div className="input-group">
             <input

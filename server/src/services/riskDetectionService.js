@@ -1,4 +1,4 @@
-import { get, all } from '../db/database.js';
+import { get, all, run } from '../db/postgres.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,13 +28,13 @@ export const detectRisks = async () => {
   // 2. Secret Logging Audit (Security Regression)
   // This is a simplified check for strings in logs if we had access to log files.
   // Instead, we'll check recent audit logs for sensitive data.
-  const sensitiveLogs = all("SELECT * FROM auth_audit_logs WHERE details LIKE '%OTP%' OR details LIKE '%token%' OR details LIKE '%password%'");
+  const sensitiveLogs = await all("SELECT * FROM auth_audit_logs WHERE details LIKE '%OTP%' OR details LIKE '%token%' OR details LIKE '%password%'");
   // The existing logAudit masks these, so finding raw values would be a risk.
   // Here we'll simulate a check for unmasked data patterns.
   
   // 3. Database Security
-  const plainTextSmtp = get("SELECT count(*) as count FROM email_settings WHERE smtp_pass NOT LIKE 'enc:%' AND smtp_pass IS NOT NULL");
-  if (plainTextSmtp.count > 0) {
+  const plainTextSmtp = await get("SELECT count(*) as count FROM email_settings WHERE smtp_pass NOT LIKE 'enc:%' AND smtp_pass IS NOT NULL");
+  if (parseInt(plainTextSmtp?.count || 0) > 0) {
     risks.push({
       risk_type: 'SECURITY_VULNERABILITY',
       severity: 'CRITICAL',
@@ -45,10 +45,10 @@ export const detectRisks = async () => {
   }
 
   // 4. OTP Configuration
-  const reusableOtp = get("SELECT count(*) as count FROM otp_tokens WHERE is_used = 0 AND expires_at < created_at"); // Logic error check
+  const reusableOtp = await get("SELECT count(*) as count FROM otp_tokens WHERE is_used = 0 AND expires_at < created_at"); // Logic error check
   // Actually check if they have no expiry
-  const noExpiryOtp = get("SELECT count(*) as count FROM otp_tokens WHERE expires_at IS NULL");
-  if (noExpiryOtp.count > 0) {
+  const noExpiryOtp = await get("SELECT count(*) as count FROM otp_tokens WHERE expires_at IS NULL");
+  if (parseInt(noExpiryOtp?.count || 0) > 0) {
     risks.push({
       risk_type: 'SECURITY_VULNERABILITY',
       severity: 'CRITICAL',
@@ -76,8 +76,8 @@ export const detectRisks = async () => {
   } catch (err) {}
 
   // 6. Connectivity Security (Phase 59)
-  const plainTurnCreds = get("SELECT count(*) as count FROM turn_servers WHERE credential_encrypted NOT LIKE 'enc:%'");
-  if (plainTurnCreds.count > 0) {
+  const plainTurnCreds = await get("SELECT count(*) as count FROM turn_servers WHERE credential_encrypted NOT LIKE 'enc:%'");
+  if (parseInt(plainTurnCreds?.count || 0) > 0) {
     risks.push({
       risk_type: 'SECURITY_VULNERABILITY',
       severity: 'HIGH',
@@ -88,8 +88,8 @@ export const detectRisks = async () => {
   }
 
   // 8. Relay Observability (Phase 60)
-  const simulatedCheck = get("SELECT count(*) as count FROM turn_health_checks WHERE status = 'ok' AND latency_ms = 0");
-  if (simulatedCheck.count > 10) {
+  const simulatedCheck = await get("SELECT count(*) as count FROM turn_health_checks WHERE status = 'ok' AND latency_ms = 0");
+  if (parseInt(simulatedCheck?.count || 0) > 10) {
     risks.push({
       risk_type: 'OBSERVABILITY_WARNING',
       severity: 'MEDIUM',
@@ -100,7 +100,7 @@ export const detectRisks = async () => {
   }
 
   const { getRelayAnomalies } = await import('./relayCostGuardService.js');
-  const anomalies = getRelayAnomalies();
+  const anomalies = await getRelayAnomalies();
   if (anomalies.length > 0) {
     risks.push({
       risk_type: 'INFRA_COST_ALERT',
@@ -114,10 +114,10 @@ export const detectRisks = async () => {
   return risks;
 };
 
-export const getRiskEvents = () => {
-  return all('SELECT * FROM risk_events WHERE status = "open" ORDER BY created_at DESC');
+export const getRiskEvents = async () => {
+  return await all('SELECT * FROM risk_events WHERE status = \'open\' ORDER BY created_at DESC');
 };
 
-export const acknowledgeRisk = (id) => {
-  return run('UPDATE risk_events SET status = "acknowledged", resolved_at = CURRENT_TIMESTAMP WHERE id = ?', id);
+export const acknowledgeRisk = async (id) => {
+  return await run('UPDATE risk_events SET status = \'acknowledged\', resolved_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
 };

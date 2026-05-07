@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config, isProduction } from '../config/env.js';
-import { get } from '../db/database.js';
+import { get } from '../db/postgres.js';
 
 let decodeCount = 0;
 
@@ -31,13 +31,13 @@ export const verifySocketToken = (token) => {
   }
 };
 
-export const checkTokenVersion = (userId, socketTokenVersion) => {
+export const checkTokenVersion = async (userId, socketTokenVersion) => {
   if (!userId || !socketTokenVersion) {
     return { valid: true };
   }
 
   try {
-    const user = get('SELECT token_version FROM users WHERE id = ?', userId);
+    const user = await get('SELECT token_version FROM users WHERE id = $1', [userId]);
     if (!user) {
       return { valid: false, error: 'User not found', code: 'USER_NOT_FOUND' };
     }
@@ -60,7 +60,7 @@ export const checkTokenVersion = (userId, socketTokenVersion) => {
 };
 
 export const attachAuthMiddleware = (io) => {
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
 
     if (!token) {

@@ -3,7 +3,7 @@ import { db } from '../db/db_provider.js';
 import { config } from '../config/env.js';
 
 export const seedSuperAdmin = async () => {
-  const existingSuperAdmin = await db.get("SELECT id, username, role FROM users WHERE role = 'super_admin'");
+  const existingSuperAdmin = await db.get("SELECT id, username, role FROM users WHERE role = $1", 'super_admin');
   
   if (existingSuperAdmin) {
     console.log('[SEED] Super admin already exists:', existingSuperAdmin.username);
@@ -21,7 +21,7 @@ export const seedSuperAdmin = async () => {
 
   const hash = await bcrypt.hash(adminPassword, 12);
   const result = await db.run(
-    'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+    'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
     adminUsername,
     'admin@zymi.com',
     hash,
@@ -30,9 +30,9 @@ export const seedSuperAdmin = async () => {
 
   console.log('[SEED] Created super_admin user:', adminUsername);
   console.log('[SEED] ADMIN CREDENTIALS: username=' + adminUsername + ', password=' + adminPassword.substring(0, 4) + '***');
-  return { id: result.lastInsertRowid, username: adminUsername };
+  return { id: result.lastID, username: adminUsername };
 };
 
-export const checkSuperAdminExists = () => {
-  return db.get("SELECT id, username FROM users WHERE role = 'super_admin'");
+export const checkSuperAdminExists = async () => {
+  return await db.get("SELECT id, username FROM users WHERE role = $1", 'super_admin');
 };

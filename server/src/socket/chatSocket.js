@@ -1,5 +1,5 @@
 import { SOCKET_EVENTS } from '../../shared/socketEvents.js';
-import { get, all, run } from '../db/database.js';
+import { get, all, run } from '../db/postgres.js';
 import { incrementMessagesToday, incrementTypingEvents, incrementDisconnects } from '../services/metricsService.js';
 import { shouldBroadcastOnline } from '../services/presenceService.js';
 import { getUserSocketRegistry } from './userSocketRegistry.js';
@@ -8,10 +8,10 @@ import * as messageQueueService from '../services/messageQueueService.js';
 import * as unreadCounterService from '../services/unreadCounterService.js';
 import * as inAppNotificationService from '../services/inAppNotificationService.js';
 
-const checkToken = (socket, userId) => {
+const checkToken = async (socket, userId) => {
   try {
     if (!userId) return true; // Skip check if no userId
-    const user = get('SELECT token_version FROM users WHERE id = ?', userId);
+    const user = await get('SELECT token_version FROM users WHERE id = $1', [userId]);
     if (user && socket.tokenVersion !== user.token_version) {
       return false;
     }
@@ -26,7 +26,7 @@ export const setupChatSocket = (io, userSockets) => {
   io.on('connection', (socket) => {
     console.log('[SOCKET] User connected:', socket.id);
 
-    socket.on(SOCKET_EVENTS.JOIN, (userId) => {
+    socket.on(SOCKET_EVENTS.JOIN, async (userId) => {
       try {
         if (!userId) return;
 
@@ -34,7 +34,7 @@ export const setupChatSocket = (io, userSockets) => {
         const normalizedUserId = String(userId);
         console.log('[SOCKET] JOIN received:', userId, '-> normalized:', normalizedUserId);
 
-        const user = get('SELECT is_banned, role, token_version, online_visibility FROM users WHERE id = ?', normalizedUserId);
+        const user = await get('SELECT is_banned, role, token_version, online_visibility FROM users WHERE id = $1', [normalizedUserId]);
 
         if (user && user.is_banned) {
           socket.emit(SOCKET_EVENTS.BANNED, { reason: 'Your account has been suspended' });
@@ -60,7 +60,7 @@ export const setupChatSocket = (io, userSockets) => {
         }
 
         // Sync unread count
-        const unreadTotal = unreadCounterService.getTotalUnread(normalizedUserId);
+        const unreadTotal = await unreadCounterService.getTotalUnread(normalizedUserId);
         socket.emit('unread-count-updated', { total: unreadTotal });
 
         // Shadow write to Redis registry (dev-only)
@@ -74,7 +74,7 @@ export const setupChatSocket = (io, userSockets) => {
         }
 
         // Only broadcast online status if visibility is enabled
-        if (shouldBroadcastOnline(userId)) {
+        if (await shouldBroadcastOnline(userId)) {
           socket.broadcast.emit(SOCKET_EVENTS.USER_ONLINE, { userId: String(userId) });
         }
 
@@ -95,12 +95,12 @@ export const setupChatSocket = (io, userSockets) => {
         if (!to || !from) return;
 
         // Token version check
-        if (!socket.tokenVersion || !checkToken(socket, socket.userId)) {
+        if (!socket.tokenVersion || !(await checkToken(socket, socket.userId))) {
           socket.disconnect();
           return;
         }
 
-        const targetUser = get('SELECT is_banned, username FROM users WHERE id = ?', to);
+        const targetUser = await get('SELECT is_banned, username FROM users WHERE id = $1', [to]);
         if (targetUser?.is_banned) return;
 
         // Phase 57: Conversation ID logic (smaller_greater)
@@ -114,7 +114,8 @@ export const setupChatSocket = (io, userSockets) => {
         const isOnline = !!targetSocketId;
 
         // Phase 57: Store message with delivery status
-        const messageId = messageQueueService.enqueueMessage({
+        // Note: messageQueueService.enqueueMessage might need to be async if it hits DB
+        const messageId = await messageQueueService.enqueueMessage({
           sender_id: from,
           receiver_id: to,
           content: messageContent,
@@ -155,7 +156,7 @@ export const setupChatSocket = (io, userSockets) => {
           io.to(targetSocketId).emit('receive_message', { ...message, tempId: undefined });
         } else {
           // Phase 57: Notification for offline user
-          const sender = get('SELECT username FROM users WHERE id = ?', from);
+          const sender = await get('SELECT username FROM users WHERE id = $1', [from]);
           inAppNotificationService.createNotification({
             user_id: to,
             type: 'message',
@@ -218,12 +219,12 @@ export const setupChatSocket = (io, userSockets) => {
       }
     });
 
-    socket.on('message-read', (data) => {
+    socket.on('message-read', async (data) => {
       try {
         const { messageId, senderId, receiverId } = data || {};
         if (!messageId || !senderId) return;
         
-        run('UPDATE messages SET is_read = 1 WHERE id = ?', messageId);
+        await run('UPDATE messages SET is_read = 1 WHERE id = $1', [messageId]);
         
         const senderSocketId = userSockets.get(String(senderId));
         if (senderSocketId) {

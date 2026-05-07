@@ -2,6 +2,7 @@ import { verifySocketToken, checkTokenVersion, attachAuthMiddleware, getAuthStat
 import { login, register, adminLogin } from '../../routes/authRoutes.js';
 import { requireAuth } from '../../middleware/authMiddleware.js';
 import { requireAdmin } from '../../middleware/adminMiddleware.js';
+import { run } from '../../db/postgres.js';
 
 export { verifySocketToken, checkTokenVersion, attachAuthMiddleware, getAuthStats, resetAuthStats };
 export { login, register, adminLogin };
@@ -14,8 +15,7 @@ export const authenticateUser = async (username, password, isAdmin = false) => {
 };
 
 export const invalidateUserTokens = async (userId) => {
-  const { run } = require('../../db/database.js');
-  run('UPDATE users SET token_version = token_version + 1 WHERE id = ?', userId);
+  await run('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [userId]);
   console.log(`[AUTH] Invalidated tokens for user: ${userId}`);
 };
 

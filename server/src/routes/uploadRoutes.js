@@ -1,4 +1,4 @@
-import { get, run } from '../db/database.js';
+import { get, run } from '../db/postgres.js';
 import { saveAvatar, deleteAvatar, validateAvatar, validateMessageFile, saveMessageFile, deleteMessageFile } from '../services/fileStorageService.js';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const uploadAvatar = (req, res) => {
+export const uploadAvatar = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
@@ -25,7 +25,7 @@ export const uploadAvatar = (req, res) => {
   }
 
   // Fetch current user to get old avatar
-  const user = get('SELECT avatar FROM users WHERE id = ?', userId);
+  const user = await get('SELECT avatar FROM users WHERE id = $1', [userId]);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -34,7 +34,7 @@ export const uploadAvatar = (req, res) => {
   const avatarUrl = saveAvatar(userId, req.file.buffer, req.file.originalname);
 
   // Update user record
-  run('UPDATE users SET avatar = ? WHERE id = ?', avatarUrl, userId);
+  await run('UPDATE users SET avatar = $1 WHERE id = $2', [avatarUrl, userId]);
 
   // Delete old avatar if exists
   if (user.avatar) {
@@ -45,53 +45,58 @@ export const uploadAvatar = (req, res) => {
 };
 
 export const getAvatar = async (req, res) => {
-  const { userId } = req.params;
+  try {
+    const { userId } = req.params;
 
-  const user = get('SELECT avatar FROM users WHERE id = ?', userId);
-  if (!user || !user.avatar) {
-    return res.status(404).json({ error: 'Avatar not found' });
+    const user = await get('SELECT avatar FROM users WHERE id = $1', [userId]);
+    if (!user || !user.avatar) {
+      return res.status(404).json({ error: 'Avatar not found' });
+    }
+
+    // Security: Prevent path traversal by using path.basename
+    const safeAvatarName = path.basename(user.avatar);
+    const avatarPath = path.join(__dirname, '../../../../uploads/avatars', safeAvatarName);
+    
+    if (!fs.existsSync(avatarPath)) {
+      return res.status(404).json({ error: 'Avatar file missing' });
+    }
+
+    // Determine content type from extension
+    const ext = path.extname(avatarPath).toLowerCase();
+    const contentTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp'
+    };
+    const contentType = contentTypes[ext] || 'image/jpeg';
+
+    res.setHeader('Content-Type', contentType);
+    const stream = fs.createReadStream(avatarPath);
+    stream.pipe(res);
+  } catch (err) {
+    console.error('[API] getAvatar error:', err);
+    res.status(500).json({ error: 'Failed to fetch avatar' });
   }
-
-  // Security: Prevent path traversal by using path.basename
-  const safeAvatarName = path.basename(user.avatar);
-  const avatarPath = path.join(__dirname, '../../../../uploads/avatars', safeAvatarName);
-  
-  if (!fs.existsSync(avatarPath)) {
-    return res.status(404).json({ error: 'Avatar file missing' });
-  }
-
-  // Determine content type from extension
-  const ext = path.extname(avatarPath).toLowerCase();
-  const contentTypes = {
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.webp': 'image/webp'
-  };
-  const contentType = contentTypes[ext] || 'image/jpeg';
-
-  res.setHeader('Content-Type', contentType);
-  const stream = fs.createReadStream(avatarPath);
-  stream.pipe(res);
 };
 
-export const deleteUserAvatar = (req, res) => {
+export const deleteUserAvatar = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
   const userId = req.user.id;
-  const user = get('SELECT avatar FROM users WHERE id = ?', userId);
+  const user = await get('SELECT avatar FROM users WHERE id = $1', [userId]);
 
   if (user?.avatar) {
     deleteAvatar(user.avatar);
-    run('UPDATE users SET avatar = NULL WHERE id = ?', userId);
+    await run('UPDATE users SET avatar = NULL WHERE id = $1', [userId]);
   }
 
   res.json({ success: true });
 };
 
-export const uploadMessageFile = (req, res) => {
+export const uploadMessageFile = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }

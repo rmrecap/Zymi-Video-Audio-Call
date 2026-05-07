@@ -1,4 +1,4 @@
-import { get, run } from '../db/database.js';
+import { get, run } from '../db/postgres.js';
 
 export const calculateProfileCompletion = (user) => {
   let score = 40; // Base registration score
@@ -11,11 +11,11 @@ export const calculateProfileCompletion = (user) => {
   return Math.min(score, 100);
 };
 
-export const updateProfileCompletion = (userId) => {
-  const user = get('SELECT * FROM users WHERE id = ?', userId);
+export const updateProfileCompletion = async (userId) => {
+  const user = await get('SELECT * FROM users WHERE id = $1', [userId]);
   if (!user) return;
 
   const newScore = calculateProfileCompletion(user);
-  run('UPDATE users SET profile_completion = ? WHERE id = ?', newScore, userId);
+  await run('UPDATE users SET profile_completion = $1 WHERE id = $2', [newScore, userId]);
   return newScore;
 };

@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { get, run } from '../db/database.js';
+import { get, run } from '../db/postgres.js';
 import { config } from '../config/env.js';
 
 const JWT_SECRET = config.jwtSecret;
@@ -27,18 +27,18 @@ export const verifyToken = (token) => {
   }
 };
 
-export const getTokenVersion = (userId) => {
-  const user = get('SELECT token_version FROM users WHERE id = ?', userId);
+export const getTokenVersion = async (userId) => {
+  const user = await get('SELECT token_version FROM users WHERE id = $1', [userId]);
   return user?.token_version || 1;
 };
 
-export const incrementTokenVersion = (userId) => {
-  run('UPDATE users SET token_version = token_version + 1 WHERE id = ?', userId);
-  const newVersion = getTokenVersion(userId);
+export const incrementTokenVersion = async (userId) => {
+  await run('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [userId]);
+  const newVersion = await getTokenVersion(userId);
   return newVersion;
 };
 
-export const isTokenValid = (userId, tokenVersion) => {
-  const currentVersion = getTokenVersion(userId);
+export const isTokenValid = async (userId, tokenVersion) => {
+  const currentVersion = await getTokenVersion(userId);
   return currentVersion === tokenVersion;
 };

@@ -10,25 +10,22 @@ import fileUpload from 'express-fileupload';
 dotenv.config();
 
 import { config, isProduction } from './src/config/env.js';
-import { initDatabase } from './src/db/database.js';
 import { initPostgres } from './src/db/postgres.js';
 import { runMigrations } from './src/db/migrations.js';
 import { initAdminSeed } from './src/config/adminSeed.js';
 import { seedDemoUsers } from './src/db/seed_demo_users.js';
 
-// Initialize DBs
-initDatabase(); // SQLite fallback
-if (config.databaseUrl) {
-  try {
-    initPostgres();
-    console.log('[DB] PostgreSQL connection pool initialized');
-  } catch (err) {
-    console.error('[DB] PostgreSQL initialization failed:', err.message);
-  }
+// Initialize PostgreSQL (required)
+try {
+  initPostgres();
+  console.log('[DB] PostgreSQL connection pool initialized');
+} catch (err) {
+  console.error('[DB] PostgreSQL initialization failed:', err.message);
+  process.exit(1);
 }
 
 // Run migrations and seeds
-runMigrations();
+await runMigrations();
 await initAdminSeed();
 await seedDemoUsers();
 
@@ -40,9 +37,9 @@ import { initCallState } from './src/services/callStateService.js';
 import { initMetrics } from './src/services/metricsService.js';
 import { logAudit } from './src/services/auditService.js';
 
-createBlockTable();
-createReportsTable();
-createCallHistoryTable();
+await createBlockTable();
+await createReportsTable();
+await createCallHistoryTable();
 initCallState();
 initMetrics();
 

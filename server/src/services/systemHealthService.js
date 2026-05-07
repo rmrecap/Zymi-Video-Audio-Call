@@ -1,4 +1,4 @@
-import { get, all } from '../db/database.js';
+import { get, all } from '../db/postgres.js';
 // Actually, I'll use internal function calls where possible to avoid HTTP overhead.
 import { isPostgresReady } from '../db/postgres.js';
 import { isRedisActive } from '../socket/redisAdapter.js';
@@ -6,8 +6,8 @@ import { isRedisActive } from '../socket/redisAdapter.js';
 export const getAggregatedHealth = async () => {
   const health = {
     database: {
-      provider: isPostgresReady() ? 'postgresql' : 'sqlite',
-      status: 'healthy', // Basic check
+      provider: 'postgresql',
+      status: isPostgresReady() ? 'healthy' : 'degraded',
       migrationStatus: 'complete'
     },
     auth: {
@@ -16,7 +16,7 @@ export const getAggregatedHealth = async () => {
     },
     otp: {
       status: 'ok',
-      activeTokens: get('SELECT COUNT(*) as count FROM otp_tokens WHERE is_used = 0 AND expires_at > CURRENT_TIMESTAMP').count,
+      activeTokens: 0,
       selfHosted: true
     },
     email: {
@@ -43,10 +43,16 @@ export const getAggregatedHealth = async () => {
     }
   };
 
+  // Check OTP stats
+  try {
+    const otpStats = await get('SELECT COUNT(*) as count FROM otp_tokens WHERE is_used = 0 AND expires_at > CURRENT_TIMESTAMP');
+    health.otp.activeTokens = parseInt(otpStats?.count || 0);
+  } catch (err) {}
+
   // Check Media Stats
   try {
     const { getMediaHealth } = await import('./mediaIndexService.js');
-    health.media.stats = getMediaHealth();
+    health.media.stats = await getMediaHealth();
   } catch (err) {}
 
   // Check Connectivity Stats
@@ -56,21 +62,21 @@ export const getAggregatedHealth = async () => {
     const { getLatestHealth } = await import('./turnHealthCheckService.js');
     const { getRelayUsageSummary } = await import('./relayUsageService.js');
     
-    const servers = getTurnServers().filter(s => s.is_active);
-    const healthData = getLatestHealth();
+    const servers = (await getTurnServers()).filter(s => s.is_active);
+    const healthData = await getLatestHealth();
     const okServers = healthData.filter(s => s.status === 'ok').length;
     
     health.connectivity.relayServers = servers.length;
-    health.connectivity.activePolicies = getPolicies().filter(p => p.is_active).length;
+    health.connectivity.activePolicies = (await getPolicies()).filter(p => p.is_active).length;
     health.connectivity.healthPercent = servers.length > 0 ? Math.round((okServers / servers.length) * 100) : 0;
-    health.connectivity.usage = getRelayUsageSummary().total;
+    health.connectivity.usage = (await getRelayUsageSummary()).total;
     health.connectivity.status = health.connectivity.healthPercent > 50 ? 'ok' : 'warning';
   } catch (err) {}
 
   // Check email
   try {
     const { getEmailSettings } = await import('./smtpConfigService.js');
-    const settings = getEmailSettings();
+    const settings = await getEmailSettings();
     if (settings) {
       health.email.status = 'configured';
       health.email.provider = settings.provider;
@@ -80,6 +86,6 @@ export const getAggregatedHealth = async () => {
   return health;
 };
 
-export const getSystemSnapshots = () => {
-  return all('SELECT * FROM system_health_snapshots ORDER BY created_at DESC LIMIT 50');
+export const getSystemSnapshots = async () => {
+  return await all('SELECT * FROM system_health_snapshots ORDER BY created_at DESC LIMIT 50');
 };

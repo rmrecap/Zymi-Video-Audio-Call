@@ -5,14 +5,14 @@ import { startCall, endCall, rejectCall as rejectCallDB, getCurrentCall } from '
 import { CALL_TIMEOUT_MS, addPendingCall, removePendingCall, startCallTimeout, clearCallTimeout, handleCallTimeout } from '../services/callStateService.js';
 import { registerActiveCall, clearActiveCall, cleanupUserActiveCall } from './callState.js';
 
-import { get } from '../db/database.js';
+import { get } from '../db/postgres.js';
 import { isBlocked } from '../routes/blockRoutes.js';
 import * as inAppNotificationService from '../services/inAppNotificationService.js';
 
-const checkToken = (socket, userId) => {
+const checkToken = async (socket, userId) => {
   try {
     if (!userId) return true; // Skip check if no userId available
-    const user = get('SELECT token_version FROM users WHERE id = ?', userId);
+    const user = await get('SELECT token_version FROM users WHERE id = $1', [userId]);
     if (user && socket.tokenVersion !== user.token_version) {
       return false;
     }
@@ -45,7 +45,7 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
       }
     };
 
-socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
+    socket.on(SOCKET_EVENTS.CALL_USER, async (data) => {
       try {
         console.log('[CALL_SOCKET] call-user received:', data);
         let { to, from, offer, type } = data || {};
@@ -63,7 +63,7 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
           return;
         }
 
-        if (!socket.tokenVersion || !checkToken(socket, from)) {
+        if (!socket.tokenVersion || !(await checkToken(socket, from))) {
           console.log('[CALL_SOCKET] Authentication failed for user:', from);
           safeEmit(SOCKET_EVENTS.CALL_REJECTED, { reason: 'Authentication failed' });
           return;
@@ -88,21 +88,21 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
           return;
         }
 
-        const call = startCall(from, to, type);
+        const call = await startCall(from, to, type);
         addPendingCall(from, to, offer, type);
 
         // Wrap timeout callback in try-catch to prevent uncaught exceptions
-        startCallTimeout(from, () => {
+        startCallTimeout(from, async () => {
           try {
             if (removePendingCall(from)) {
-              const timedOutCall = handleCallTimeout(from);
+              const timedOutCall = await handleCallTimeout(from);
               if (timedOutCall) {
                 safeBroadcast(userSockets.get(from), SOCKET_EVENTS.CALL_TIMEOUT, { to, callId: timedOutCall.id });
                 safeBroadcast(targetSocketId, SOCKET_EVENTS.CALL_REJECTED, { reason: 'Call timed out' });
                 logAudit(from, 'call_timeout', to, `Call timed out after ${CALL_TIMEOUT_MS}ms`);
 
                 // Phase 57: Missed call notification
-                const caller = get('SELECT username FROM users WHERE id = ?', from);
+                const caller = await get('SELECT username FROM users WHERE id = $1', [from]);
                 inAppNotificationService.createNotification({
                   user_id: to,
                   type: 'call_missed',
@@ -126,7 +126,7 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
       }
     });
 
-    socket.on(SOCKET_EVENTS.MAKE_ANSWER, (data) => {
+    socket.on(SOCKET_EVENTS.MAKE_ANSWER, async (data) => {
       try {
         let { to, answer } = data || {};
 
@@ -136,14 +136,14 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
         }
         to = String(to);
 
-        if (!socket.tokenVersion || !checkToken(socket, socket.userId)) {
+        if (!socket.tokenVersion || !(await checkToken(socket, socket.userId))) {
           return;
         }
         callActivity.activeCalls++;
         clearCallTimeout(socket.userId);
         const currentCall = getCurrentCall(socket.userId);
         if (currentCall) {
-          endCall(currentCall.id, 'accepted');
+          await endCall(currentCall.id, 'accepted');
         }
         removePendingCall(socket.userId);
 
@@ -157,7 +157,7 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
       }
     });
 
-    socket.on(SOCKET_EVENTS.ICE_CANDIDATE, (data) => {
+    socket.on(SOCKET_EVENTS.ICE_CANDIDATE, async (data) => {
       try {
         let { to, candidate } = data || {};
 
@@ -167,7 +167,7 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
         }
         to = String(to);
 
-        if (!socket.tokenVersion || !checkToken(socket, socket.userId)) {
+        if (!socket.tokenVersion || !(await checkToken(socket, socket.userId))) {
           return;
         }
         safeBroadcast(userSockets.get(to), SOCKET_EVENTS.ICE_CANDIDATE, { candidate });
@@ -177,21 +177,21 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
       }
     });
 
-    socket.on(SOCKET_EVENTS.END_CALL, (data) => {
+    socket.on(SOCKET_EVENTS.END_CALL, async (data) => {
       try {
         let { to, from } = data || {};
         if (!to) return;
         to = String(to);
         if (process.env.NODE_ENV === 'development') console.log('[CALL] end-call emit', {to, from});
 
-        if (!socket.tokenVersion || !checkToken(socket, socket.userId)) {
+        if (!socket.tokenVersion || !(await checkToken(socket, socket.userId))) {
           return;
         }
         callActivity.activeCalls = Math.max(0, callActivity.activeCalls - 1);
         clearCallTimeout(socket.userId);
         const currentCall = getCurrentCall(socket.userId);
         if (currentCall) {
-          endCall(currentCall.id, 'ended');
+          await endCall(currentCall.id, 'ended');
         }
         removePendingCall(socket.userId);
 
@@ -208,19 +208,19 @@ socket.on(SOCKET_EVENTS.CALL_USER, (data) => {
       }
     });
 
-    socket.on(SOCKET_EVENTS.REJECT_CALL, (data) => {
+    socket.on(SOCKET_EVENTS.REJECT_CALL, async (data) => {
       try {
         let { to, from } = data || {};
         if (!to) return;
         to = String(to);
 
-        if (!socket.tokenVersion || !checkToken(socket, socket.userId)) {
+        if (!socket.tokenVersion || !(await checkToken(socket, socket.userId))) {
           return;
         }
         clearCallTimeout(socket.userId);
         const currentCall = getCurrentCall(socket.userId);
         if (currentCall) {
-          rejectCallDB(currentCall.id);
+          await rejectCallDB(currentCall.id);
         }
         removePendingCall(socket.userId);
 

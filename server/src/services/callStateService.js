@@ -77,10 +77,10 @@ export const getCallState = () => ({
 });
 
 // Timeout handler to be used by callSocket
-export const handleCallTimeout = (callerId) => {
+export const handleCallTimeout = async (callerId) => {
   const currentCall = getHistoryCurrentCall(callerId);
   if (currentCall) {
-    missCall(currentCall.id);
+    await missCall(currentCall.id);
     return currentCall;
   }
   return null;

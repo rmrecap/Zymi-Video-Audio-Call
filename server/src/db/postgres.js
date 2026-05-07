@@ -43,10 +43,74 @@ export const query = async (text, params) => {
     throw new Error('PostgreSQL not initialized');
   }
   const start = Date.now();
-  const res = await pool.query(text, params);
-  const duration = Date.now() - start;
-  console.log('[POSTGRES] Executed query', { text: text.substring(0, 50), duration, rows: res.rowCount });
-  return res;
+  try {
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    console.log('[POSTGRES] Executed query', { text: text.substring(0, 50), duration, rows: res.rowCount });
+    return res;
+  } catch (err) {
+    console.error('[POSTGRES] Query error:', err.message, { text });
+    throw err;
+  }
+};
+
+export const get = async (text, params) => {
+  const res = await query(text, params);
+  return res.rows[0] || null;
+};
+
+export const all = async (text, params) => {
+  const res = await query(text, params);
+  return res.rows;
+};
+
+export const run = async (text, params) => {
+  const res = await query(text, params);
+  return {
+    lastID: res.rows[0]?.id || null,
+    changes: res.rowCount
+  };
+};
+
+export const exec = async (text) => {
+  return query(text);
+};
+
+/**
+ * Runs a set of operations within a transaction.
+ */
+export const withTransaction = async (callback) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const helpers = {
+      run: async (sql, params = []) => {
+        const res = await client.query(sql, params);
+        return { lastID: res.rows[0]?.id || null, changes: res.rowCount };
+      },
+      get: async (sql, params = []) => {
+        const res = await client.query(sql, params);
+        return res.rows[0];
+      },
+      all: async (sql, params = []) => {
+        const res = await client.query(sql, params);
+        return res.rows;
+      },
+      exec: async (sql) => {
+        await client.query(sql);
+      }
+    };
+    
+    const result = await callback(helpers);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 export const getClient = async () => {

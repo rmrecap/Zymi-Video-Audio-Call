@@ -1,8 +1,8 @@
-import { get, all, run } from '../db/database.js';
+import { get, all, run } from '../db/postgres.js';
 import { decrypt, encrypt } from '../utils/encryption.js';
 
-export const getActiveIceServers = (countryIso = null) => {
-  const servers = all('SELECT * FROM turn_servers WHERE is_active = 1 ORDER BY priority ASC');
+export const getActiveIceServers = async (countryIso = null) => {
+  const servers = await all('SELECT * FROM turn_servers WHERE is_active = 1 ORDER BY priority ASC');
   
   const iceServers = [];
   
@@ -46,7 +46,7 @@ export const getActiveIceServers = (countryIso = null) => {
   return iceServers;
 };
 
-export const addTurnServer = (data) => {
+export const addTurnServer = async (data) => {
   const { label, stun_url, turn_url_udp, turn_url_tcp, turn_url_tls, username, credential, realm, region, country_scope_json, priority } = data;
   
   const credential_encrypted = encrypt(credential);
@@ -55,25 +55,26 @@ export const addTurnServer = (data) => {
     INSERT INTO turn_servers (
       label, stun_url, turn_url_udp, turn_url_tcp, turn_url_tls, 
       username, credential_encrypted, realm, region, country_scope_json, priority
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
   `;
   
-  return run(sql, label, stun_url, turn_url_udp, turn_url_tcp, turn_url_tls, username, credential_encrypted, realm, region, country_scope_json || '[]', priority || 1);
+  return await run(sql, [label, stun_url, turn_url_udp, turn_url_tcp, turn_url_tls, username, credential_encrypted, realm, region, country_scope_json || '[]', priority || 1]);
 };
 
-export const updateTurnServer = (id, data) => {
-  const current = get('SELECT * FROM turn_servers WHERE id = ?', id);
+export const updateTurnServer = async (id, data) => {
+  const current = await get('SELECT * FROM turn_servers WHERE id = $1', [id]);
   if (!current) throw new Error('Server not found');
 
   const updates = [];
   const params = [];
+  let idx = 1;
 
   Object.entries(data).forEach(([key, value]) => {
     if (key === 'credential') {
-      updates.push('credential_encrypted = ?');
+      updates.push(`credential_encrypted = $${idx++}`);
       params.push(encrypt(value));
     } else if (key !== 'id') {
-      updates.push(`${key} = ?`);
+      updates.push(`${key} = $${idx++}`);
       params.push(value);
     }
   });
@@ -81,16 +82,16 @@ export const updateTurnServer = (id, data) => {
   if (updates.length === 0) return;
 
   params.push(id);
-  return run(`UPDATE turn_servers SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...params);
+  return await run(`UPDATE turn_servers SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`, params);
 };
 
-export const getTurnServers = () => {
-  return all('SELECT id, label, stun_url, turn_url_udp, turn_url_tcp, turn_url_tls, username, realm, region, country_scope_json, is_active, priority, created_at, updated_at FROM turn_servers');
+export const getTurnServers = async () => {
+  return await all('SELECT id, label, stun_url, turn_url_udp, turn_url_tcp, turn_url_tls, username, realm, region, country_scope_json, is_active, priority, created_at, updated_at FROM turn_servers');
 };
 
 export const testTurnServer = async (id) => {
   // Logic for server-side testing if possible, otherwise return config for client test
-  const server = get('SELECT * FROM turn_servers WHERE id = ?', id);
+  const server = await get('SELECT * FROM turn_servers WHERE id = $1', [id]);
   if (!server) throw new Error('Server not found');
   
   return {

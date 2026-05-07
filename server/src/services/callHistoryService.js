@@ -1,22 +1,38 @@
-import { exec, get, all, run } from '../db/database.js';
+import { exec, get, all, run } from '../db/postgres.js';
 
-const tableExists = (tableName) => {
-  const result = get("SELECT name FROM sqlite_master WHERE type='table' AND name = ?", tableName);
+const tableExists = async (tableName) => {
+  const result = await get(`
+    SELECT table_name 
+    FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = $1
+  `, [tableName]);
   return !!result;
 };
 
-export const createCallHistoryTable = () => {
-  if (!tableExists('call_history')) {
-    exec(`
+const columnExists = async (tableName, columnName) => {
+  const result = await get(`
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = $1 
+    AND column_name = $2
+  `, [tableName, columnName]);
+  return !!result;
+};
+
+export const createCallHistoryTable = async () => {
+  if (!(await tableExists('call_history'))) {
+    await exec(`
       CREATE TABLE IF NOT EXISTS call_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         caller_id INTEGER NOT NULL,
         receiver_id INTEGER NOT NULL,
         call_type TEXT NOT NULL,
         status TEXT NOT NULL,
-        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        answered_at DATETIME,
-        ended_at DATETIME,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        answered_at TIMESTAMP,
+        ended_at TIMESTAMP,
         duration INTEGER DEFAULT 0,
         FOREIGN KEY (caller_id) REFERENCES users(id),
         FOREIGN KEY (receiver_id) REFERENCES users(id)
@@ -25,9 +41,8 @@ export const createCallHistoryTable = () => {
     console.log('[MIGRATION] Created call_history table');
   } else {
     // Check if answered_at column exists, add if missing
-    const columns = all('PRAGMA table_info(call_history)');
-    if (!columns.some(col => col.name === 'answered_at')) {
-      exec('ALTER TABLE call_history ADD COLUMN answered_at DATETIME');
+    if (!(await columnExists('call_history', 'answered_at'))) {
+      await exec('ALTER TABLE call_history ADD COLUMN answered_at TIMESTAMP');
       console.log('[MIGRATION] Added answered_at column to call_history');
     }
   }
@@ -36,17 +51,14 @@ export const createCallHistoryTable = () => {
 // Per-caller call registry instead of singleton — supports concurrent calls
 const activeCalls = new Map(); // callerId -> { id, callerId, receiverId, startTime }
 
-export const startCall = (callerId, receiverId, callType) => {
+export const startCall = async (callerId, receiverId, callType) => {
   const callerKey = String(callerId);
-  const result = run(
-    'INSERT INTO call_history (caller_id, receiver_id, call_type, status) VALUES (?, ?, ?, ?)',
-    callerId,
-    receiverId,
-    callType,
-    'started'
+  const result = await run(
+    'INSERT INTO call_history (caller_id, receiver_id, call_type, status) VALUES ($1, $2, $3, $4) RETURNING id',
+    [callerId, receiverId, callType, 'started']
   );
   const callData = {
-    id: result.lastInsertRowid,
+    id: result.lastID,
     callerId,
     receiverId,
     startTime: Date.now()
@@ -55,7 +67,7 @@ export const startCall = (callerId, receiverId, callType) => {
   return callData;
 };
 
-export const endCall = (callId, status = 'completed') => {
+export const endCall = async (callId, status = 'completed') => {
   // Find the call by ID in the map
   let call = null;
   let callerKey = null;
@@ -68,29 +80,25 @@ export const endCall = (callId, status = 'completed') => {
   }
   if (!call) return null;
 
-  const endedAt = new Date().toISOString();
   const duration = Math.floor((Date.now() - call.startTime) / 1000);
 
   let answeredAt = null;
   if (status === 'accepted' || status === 'ended') {
-    answeredAt = new Date(new Date(call.startTime).getTime() + 5000).toISOString(); // approximate answer time
+    // approximate answer time
+    answeredAt = new Date(new Date(call.startTime).getTime() + 5000); 
   }
 
-  run(
-    'UPDATE call_history SET status = ?, answered_at = ?, ended_at = ?, duration = ? WHERE id = ?',
-    status,
-    answeredAt,
-    endedAt,
-    duration,
-    callId
+  await run(
+    'UPDATE call_history SET status = $1, answered_at = $2, ended_at = CURRENT_TIMESTAMP, duration = $3 WHERE id = $4',
+    [status, answeredAt, duration, callId]
   );
 
-  const ended = { ...call, status, answeredAt, endedAt, duration };
+  const ended = { ...call, status, answeredAt, endedAt: new Date(), duration };
   activeCalls.delete(callerKey);
   return ended;
 };
 
-export const missCall = (callId) => {
+export const missCall = async (callId) => {
   let call = null;
   let callerKey = null;
   for (const [key, c] of activeCalls) {
@@ -102,21 +110,17 @@ export const missCall = (callId) => {
   }
   if (!call) return null;
 
-  const endedAt = new Date().toISOString();
-
-  run(
-    'UPDATE call_history SET status = ?, ended_at = ?, duration = 0 WHERE id = ?',
-    'missed',
-    endedAt,
-    callId
+  await run(
+    'UPDATE call_history SET status = $1, ended_at = CURRENT_TIMESTAMP, duration = 0 WHERE id = $2',
+    ['missed', callId]
   );
 
-  const ended = { ...call, status: 'missed', endedAt, duration: 0 };
+  const ended = { ...call, status: 'missed', endedAt: new Date(), duration: 0 };
   activeCalls.delete(callerKey);
   return ended;
 };
 
-export const rejectCall = (callId) => {
+export const rejectCall = async (callId) => {
   let call = null;
   let callerKey = null;
   for (const [key, c] of activeCalls) {
@@ -128,22 +132,18 @@ export const rejectCall = (callId) => {
   }
   if (!call) return null;
 
-  const endedAt = new Date().toISOString();
-
-  run(
-    'UPDATE call_history SET status = ?, ended_at = ?, duration = 0 WHERE id = ?',
-    'rejected',
-    endedAt,
-    callId
+  await run(
+    'UPDATE call_history SET status = $1, ended_at = CURRENT_TIMESTAMP, duration = 0 WHERE id = $2',
+    ['rejected', callId]
   );
 
-  const ended = { ...call, status: 'rejected', endedAt, duration: 0 };
+  const ended = { ...call, status: 'rejected', endedAt: new Date(), duration: 0 };
   activeCalls.delete(callerKey);
   return ended;
 };
 
-export const getCallHistory = (userId, limit = 50) => {
-  return all(`
+export const getCallHistory = async (userId, limit = 50) => {
+  return await all(`
     SELECT 
       h.id,
       h.caller_id,
@@ -158,10 +158,10 @@ export const getCallHistory = (userId, limit = 50) => {
     FROM call_history h
     JOIN users u ON h.caller_id = u.id
     JOIN users r ON h.receiver_id = r.id
-    WHERE h.caller_id = ? OR h.receiver_id = ?
+    WHERE h.caller_id = $1 OR h.receiver_id = $2
     ORDER BY h.started_at DESC
-    LIMIT ?
-  `, userId, userId, limit);
+    LIMIT $3
+  `, [userId, userId, limit]);
 };
 
 // Get current call for a specific caller (used by callSocket handlers)

@@ -3,7 +3,7 @@ import { query, getPostgresPool } from '../db/postgres.js';
 let lastInsertRowid = null;
 
 const updateLastInsertRowid = (result) => {
-  lastInsertRowid = result?.insertId || null;
+  lastInsertRowid = result?.rows?.[0]?.id || null;
   return lastInsertRowid;
 };
 

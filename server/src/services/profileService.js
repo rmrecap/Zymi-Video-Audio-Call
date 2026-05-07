@@ -1,14 +1,14 @@
-import { get, run } from '../db/database.js';
+import { get, run } from '../db/postgres.js';
 import { calculateProfileCompletion } from './profileCompletionService.js';
 
-export const getProfile = (userId) => {
-  const user = get(`
+export const getProfile = async (userId) => {
+  const user = await get(`
     SELECT 
       id, username, display_name, status_text, avatar, 
       phone, phone_verified, email, email_verified, 
       profile_completion, verification_status, created_at 
-    FROM users WHERE id = ?
-  `, userId);
+    FROM users WHERE id = $1
+  `, [userId]);
 
   if (!user) return null;
 
@@ -22,28 +22,29 @@ export const getProfile = (userId) => {
   };
 };
 
-export const updateProfile = (userId, data) => {
+export const updateProfile = async (userId, data) => {
   const updates = [];
   const params = [];
+  let idx = 1;
 
   if (data.displayName !== undefined) {
-    updates.push('display_name = ?');
+    updates.push(`display_name = $${idx++}`);
     params.push(data.displayName);
   }
   if (data.statusText !== undefined) {
-    updates.push('status_text = ?');
+    updates.push(`status_text = $${idx++}`);
     params.push(data.statusText);
   }
 
   if (updates.length === 0) return { success: false, error: 'No updates provided' };
 
   params.push(userId);
-  run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, ...params);
+  await run(`UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`, params);
 
   // Re-calculate completion
-  const user = get('SELECT * FROM users WHERE id = ?', userId);
+  const user = await get('SELECT * FROM users WHERE id = $1', [userId]);
   const newScore = calculateProfileCompletion(user);
-  run('UPDATE users SET profile_completion = ? WHERE id = ?', newScore, userId);
+  await run('UPDATE users SET profile_completion = $1 WHERE id = $2', [newScore, userId]);
 
   return { success: true, profileCompletion: newScore };
 };

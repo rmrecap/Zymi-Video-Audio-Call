@@ -1,16 +1,16 @@
-import { all, get, run } from '../db/database.js';
+import { all, get, run } from '../db/postgres.js';
 import { getAggregatedHealth } from './systemHealthService.js';
 import { detectRisks } from './riskDetectionService.js';
 
 export const getProjectSummary = async () => {
-  const phases = all('SELECT * FROM project_phases ORDER BY phase_number ASC');
+  const phases = await all('SELECT * FROM project_phases ORDER BY phase_number ASC');
   const health = await getAggregatedHealth();
   const risks = await detectRisks();
-  const openRisks = all('SELECT * FROM risk_events WHERE status = "open"');
+  const openRisks = await all('SELECT * FROM risk_events WHERE status = \'open\'');
 
   const completedPhases = phases.filter(p => p.status === 'completed').length;
   const totalPhases = phases.length;
-  const productionReadiness = Math.round((completedPhases / totalPhases) * 100);
+  const productionReadiness = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
 
   return {
     productionReadiness,
@@ -22,32 +22,37 @@ export const getProjectSummary = async () => {
   };
 };
 
-export const getPhases = () => {
-  return all('SELECT * FROM project_phases ORDER BY phase_number ASC');
+export const getPhases = async () => {
+  return await all('SELECT * FROM project_phases ORDER BY phase_number ASC');
 };
 
-export const getTasks = (phaseId) => {
+export const getTasks = async (phaseId) => {
   if (phaseId) {
-    return all('SELECT * FROM project_tasks WHERE phase_id = ? ORDER BY priority DESC, created_at DESC', phaseId);
+    return await all('SELECT * FROM project_tasks WHERE phase_id = $1 ORDER BY priority DESC, created_at DESC', [phaseId]);
   }
-  return all('SELECT * FROM project_tasks ORDER BY priority DESC, created_at DESC');
+  return await all('SELECT * FROM project_tasks ORDER BY priority DESC, created_at DESC');
 };
 
-export const addTask = (task) => {
+export const addTask = async (task) => {
   const { phase_id, task_title, task_type, priority, risk_level, notes } = task;
-  return run(`
+  return await run(`
     INSERT INTO project_tasks (phase_id, task_title, task_type, priority, risk_level, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `, phase_id, task_title, task_type || 'feature', priority || 'medium', risk_level || 'LOW', notes);
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [phase_id, task_title, task_type || 'feature', priority || 'medium', risk_level || 'LOW', notes]);
 };
 
-export const updateTask = (id, updates) => {
-  const fields = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+export const updateTask = async (id, updates) => {
+  const keys = Object.keys(updates);
+  if (keys.length === 0) return;
+
+  let idx = 1;
+  const fields = keys.map(k => `${k} = $${idx++}`).join(', ');
   const values = Object.values(updates);
   values.push(id);
-  return run(`UPDATE project_tasks SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...values);
+  
+  return await run(`UPDATE project_tasks SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`, values);
 };
 
-export const getDeploymentChecks = () => {
-  return all('SELECT * FROM deployment_checks ORDER BY created_at ASC');
+export const getDeploymentChecks = async () => {
+  return await all('SELECT * FROM deployment_checks ORDER BY created_at ASC');
 };

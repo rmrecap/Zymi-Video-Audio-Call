@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { isPostgresReady, testConnection } from '../db/postgres.js';
+import { isPostgresReady, testConnection, get, all } from '../db/postgres.js';
 import { isRedisActive, testRedis } from '../socket/redisAdapter.js';
-import { get } from '../db/database.js';
 
 const router = Router();
 
@@ -20,7 +19,7 @@ router.get('/health/db', async (req, res) => {
       return res.status(503).json({
         status: 'unavailable',
         provider: 'none',
-        message: 'PostgreSQL not configured, using SQLite'
+        message: 'PostgreSQL not configured'
       });
     }
 
@@ -115,34 +114,46 @@ router.get('/api/health/auth', (req, res) => {
   });
 });
 
-router.get('/api/health/otp', (req, res) => {
-  const result = get('SELECT COUNT(*) as count FROM otp_tokens WHERE is_used = 0 AND expires_at > CURRENT_TIMESTAMP');
-  res.json({
-    status: 'ok',
-    activeTokens: result.count,
-    expiryWindowMinutes: 5,
-    selfHosted: true
-  });
+router.get('/api/health/otp', async (req, res) => {
+  try {
+    const result = await get('SELECT COUNT(*) as count FROM otp_tokens WHERE is_used = 0 AND expires_at > CURRENT_TIMESTAMP');
+    res.json({
+      status: 'ok',
+      activeTokens: parseInt(result?.count || 0),
+      expiryWindowMinutes: 5,
+      selfHosted: true
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/api/health/email', async (req, res) => {
-  const { getEmailSettings } = await import('../services/smtpConfigService.js');
-  const settings = getEmailSettings();
-  res.json({
-    status: settings ? 'configured' : 'not_configured',
-    provider: settings?.provider || 'none',
-    smtpActive: settings?.provider === 'smtp',
-    gmailFallbackActive: settings?.provider === 'gmail'
-  });
+  try {
+    const { getEmailSettings } = await import('../services/smtpConfigService.js');
+    const settings = await getEmailSettings();
+    res.json({
+      status: settings ? 'configured' : 'not_configured',
+      provider: settings?.provider || 'none',
+      smtpActive: settings?.provider === 'smtp',
+      gmailFallbackActive: settings?.provider === 'gmail'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/api/health/profile-completion', (req, res) => {
-  const stats = get('SELECT AVG(profile_completion) as avgCompletion FROM users');
-  res.json({
-    status: 'ok',
-    averageProfileCompletion: Math.round(stats.avgCompletion || 0),
-    logic: 'Phase 54 Extended'
-  });
+router.get('/api/health/profile-completion', async (req, res) => {
+  try {
+    const stats = await get('SELECT AVG(profile_completion) as avgCompletion FROM users');
+    res.json({
+      status: 'ok',
+      averageProfileCompletion: Math.round(stats?.avgcompletion || 0),
+      logic: 'Phase 54 Extended'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

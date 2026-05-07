@@ -83,7 +83,7 @@ export const banUser = async (req, res) => {
   }
   
   try {
-    const user = await db.get('SELECT * FROM users WHERE id = ?', userId);
+    const user = await db.get('SELECT * FROM users WHERE id = $1', userId);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -93,7 +93,7 @@ export const banUser = async (req, res) => {
       return res.status(403).json({ error: 'Cannot ban admin' });
     }
     
-    await db.run('UPDATE users SET is_banned = TRUE, banned_at = NOW() WHERE id = ?', userId);
+    await db.run('UPDATE users SET is_banned = TRUE, banned_at = NOW() WHERE id = $1', userId);
     
     logAudit(req.adminUser.id, 'ban_user', userId, reason || 'No reason provided');
     
@@ -120,7 +120,7 @@ export const unbanUser = async (req, res) => {
   }
   
   try {
-    await db.run('UPDATE users SET is_banned = FALSE, banned_at = NULL WHERE id = ?', userId);
+    await db.run('UPDATE users SET is_banned = FALSE, banned_at = NULL WHERE id = $1', userId);
     logAudit(req.adminUser.id, 'unban_user', userId, 'User unbanned');
     res.json({ success: true, message: 'User unbanned successfully' });
   } catch (err) {
@@ -251,7 +251,7 @@ export const updateUserRole = async (req, res) => {
   }
   
   try {
-    const user = await db.get('SELECT * FROM users WHERE id = ?', userId);
+    const user = await db.get('SELECT * FROM users WHERE id = $1', userId);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -265,7 +265,7 @@ export const updateUserRole = async (req, res) => {
       return res.status(403).json({ error: 'Only super_admin can assign super_admin role' });
     }
     
-    await db.run('UPDATE users SET role = ? WHERE id = ?', newRole, userId);
+    await db.run('UPDATE users SET role = $1 WHERE id = $2', newRole, userId);
     logAudit(req.adminUser.id, 'role_change', userId, `Changed role from ${user.role} to ${newRole}`);
     res.json({ success: true, message: 'Role updated successfully' });
   } catch (err) {
@@ -285,14 +285,14 @@ export const changePassword = async (req, res) => {
   }
 
   try {
-    const admin = await db.get('SELECT * FROM users WHERE id = ?', req.adminUser.id);
+    const admin = await db.get('SELECT * FROM users WHERE id = $1', req.adminUser.id);
 
     if (!admin || !bcrypt.compareSync(currentPassword, admin.password_hash)) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
     const hash = bcrypt.hashSync(newPassword, 12);
-    await db.run('UPDATE users SET password_hash = ? WHERE id = ?', hash, req.adminUser.id);
+    await db.run('UPDATE users SET password_hash = $1 WHERE id = $2', hash, req.adminUser.id);
 
     incrementTokenVersion(req.adminUser.id);
     logAudit(req.adminUser.id, 'password_change', req.adminUser.id, 'Admin changed password');
@@ -335,36 +335,26 @@ export const getMigrationStatus = async (req, res) => {
   }
 };
 
-export const exportData = (req, res) => {
-  const format = req.query.format || 'json'; // json or csv
-  const tables = all("SELECT name FROM sqlite_master WHERE type='table'");
-  const tableNames = tables.map(t => t.name);
-
+export const exportData = async (req, res) => {
+  const format = req.query.format || 'json';
+  const allowedTables = ['users', 'messages', 'call_history', 'admin_audit_logs', 'message_reports', 'blocked_users'];
   const data = {};
 
-  // Export sanitized data from each table
-  tableNames.forEach(table => {
-    const allowedTables = ['users', 'messages', 'call_history', 'admin_audit_logs', 'message_reports', 'blocked_users'];
-    if (allowedTables.includes(table)) {
-      try {
-        // Strict mapping to prevent any potential interpolation risk
-        const targetTable = allowedTables.find(t => t === table);
-        const rows = all(`SELECT * FROM ${targetTable}`);
-        // Sanitize: remove sensitive fields
-        const sanitized = rows.map(row => {
-          const sanitizedRow = { ...row };
-          if (table === 'users') {
-            delete sanitizedRow.password;
-            delete sanitizedRow.token_version;
-          }
-          return sanitizedRow;
-        });
-        data[table] = sanitized;
-      } catch (err) {
-        data[table] = [{ error: 'Could not read table' }];
-      }
+  for (const table of allowedTables) {
+    try {
+      const rows = await db.all(`SELECT * FROM ${table}`);
+      data[table] = rows.map(row => {
+        const sanitized = { ...row };
+        if (table === 'users') {
+          delete sanitized.password_hash;
+          delete sanitized.token_version;
+        }
+        return sanitized;
+      });
+    } catch (err) {
+      data[table] = [{ error: 'Could not read table' }];
     }
-  });
+  }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('.')[0];
   const filename = `zymi_backup_${timestamp}`;
@@ -372,29 +362,23 @@ export const exportData = (req, res) => {
   if (format === 'csv') {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
-    // Simple CSV: each table as separate section with headers
     let csv = '';
-    Object.keys(data).forEach(table => {
+    for (const table of Object.keys(data)) {
       csv += `\n# TABLE: ${table}\n`;
       const rows = data[table];
       if (Array.isArray(rows) && rows.length > 0) {
         const headers = Object.keys(rows[0]);
         csv += headers.join(',') + '\n';
         rows.forEach(row => {
-          const values = headers.map(h => JSON.stringify(row[h] || ''));
-          csv += values.join(',') + '\n';
+          csv += headers.map(h => JSON.stringify(row[h] ?? '')).join(',') + '\n';
         });
       }
-    });
+    }
     res.send(csv);
   } else {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
-    res.json({
-      exportedAt: new Date().toISOString(),
-      version: '1.0',
-      data
-    });
+    res.json({ exportedAt: new Date().toISOString(), version: '1.0', data });
   }
 
   logAudit(req.adminUser.id, 'data_export', null, `Exported data in ${format} format`);
@@ -541,18 +525,20 @@ export const getSocketRegistryHealth = (req, res) => {
 
 export const getAiAnalysis = async (req, res) => {
   try {
-    const userCount = get('SELECT COUNT(*) as count FROM users');
-    const messageCount = get('SELECT COUNT(*) as count FROM messages');
+    const userCount = await db.get('SELECT COUNT(*) as count FROM users');
+    const messageCount = await db.get('SELECT COUNT(*) as count FROM messages');
     const today = new Date().toISOString().split('T')[0];
-    const messagesToday = get("SELECT COUNT(*) as count FROM messages WHERE date(timestamp) = ?", today);
+    const messagesToday = await db.get(
+      'SELECT COUNT(*) as count FROM messages WHERE timestamp::date = $1', today
+    );
     const metrics = getMetricsSummary();
     const activeConnections = req.app.get('userSockets')?.size || 0;
     const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
 
     const stats = {
-      totalUsers: userCount.count,
-      totalMessages: messageCount.count,
-      messagesToday: messagesToday.count,
+      totalUsers: parseInt(userCount?.count || 0),
+      totalMessages: parseInt(messageCount?.count || 0),
+      messagesToday: parseInt(messagesToday?.count || 0),
       failedCallsToday: metrics.failedCallsToday,
       activeConnections,
       activeCalls: callActivity.activeCalls,
