@@ -1,18 +1,18 @@
-import { all, get, run, withTransaction } from '../db/postgres.js';
+import { db } from '../db/db_provider.js';
 
 export const adConfigService = {
   createSnapshot: async () => {
-    const global = await get('SELECT * FROM ad_global_settings WHERE id = 1');
-    const networks = await all('SELECT * FROM ad_network_configs');
-    const placements = await all('SELECT * FROM ad_placements');
-    const countryRules = await all('SELECT * FROM ad_country_rules');
-    const versionRules = await all('SELECT * FROM ad_version_rules');
-    
+    const global = await db.get('SELECT * FROM ad_global_settings WHERE id = 1');
+    const networks = await db.all('SELECT * FROM ad_network_configs');
+    const placements = await db.all('SELECT * FROM ad_placements');
+    const countryRules = await db.all('SELECT * FROM ad_country_rules');
+    const versionRules = await db.all('SELECT * FROM ad_version_rules');
+
     const snapshotData = JSON.stringify({
       global, networks, placements, countryRules, versionRules
     });
-    
-    await run('INSERT INTO ad_config_snapshots (snapshot_data) VALUES ($1)', [snapshotData]);
+
+    await db.run('INSERT INTO ad_config_snapshots (snapshot_data) VALUES (?)', [snapshotData]);
   },
 
   rollbackToLastSnapshot: async (adminId) => {

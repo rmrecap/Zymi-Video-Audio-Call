@@ -905,7 +905,7 @@ const handleSelectUser = (u) => {
   };
 
   // Unified Premium UI Layout (handles both desktop and mobile internally)
-  const filteredUsers = users.filter(u => !userSearchQuery || u.username.toLowerCase().includes(userSearchQuery.toLowerCase()));
+  const filteredUsers = users.filter(u => !userSearchQuery || (u.username || '').toLowerCase().includes(userSearchQuery.toLowerCase()));
   
   return (
     <div className="zymi-premium-app">

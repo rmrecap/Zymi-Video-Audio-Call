@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class CallQualityReporter {
-  static const String _apiBaseUrl = 'http://localhost:5000/api/webrtc'; // Replace with env/config
+  static const String _apiBaseUrl = '${String.fromEnvironment('API_URL', defaultValue: 'http://localhost:5001')}/api/webrtc';
 
   static Future<void> reportCallQuality({
     required String callId,

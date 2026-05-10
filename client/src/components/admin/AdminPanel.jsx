@@ -401,6 +401,7 @@ function AdminPanel({ admin, onLogout }) {
   const formatTime = (timestamp) => new Date(timestamp).toLocaleString();
 
   const getActionIcon = (action) => {
+    if (!action) return '⚙️';
     if (action.includes('login')) return '🔑';
     if (action.includes('ban')) return '🚫';
     if (action.includes('unban')) return '✅';

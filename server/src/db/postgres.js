@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { config, isProduction } from '../config/env.js';
+import { db as sqlite } from './sqlite_provider.js';
 
 const { Pool } = pg;
 
@@ -10,7 +11,7 @@ export const initPostgres = () => {
     if (isProduction()) {
       throw new Error('DATABASE_URL is required in production');
     }
-    console.warn('[POSTGRES] DATABASE_URL not set, PostgreSQL not available');
+    console.warn('[POSTGRES] DATABASE_URL not set, falling back to SQLite');
     return null;
   }
 
@@ -30,9 +31,6 @@ export const initPostgres = () => {
 };
 
 export const getPostgresPool = () => {
-  if (!pool) {
-    throw new Error('PostgreSQL pool not initialized. Call initPostgres() first.');
-  }
   return pool;
 };
 
@@ -40,11 +38,24 @@ export const isPostgresReady = () => pool !== null;
 
 export const query = async (text, params) => {
   if (!pool) {
-    throw new Error('PostgreSQL not initialized');
+    // Fallback to SQLite
+    const start = Date.now();
+    const isGet = text.trim().toUpperCase().startsWith('SELECT');
+    let rows = [];
+    if (isGet) {
+        rows = sqlite.all(text, params || []);
+    } else {
+        const res = sqlite.run(text, params || []);
+        rows = res.lastID ? [{ id: res.lastID }] : [];
+    }
+    const duration = Date.now() - start;
+    console.log('[SQLITE] Executed query', { text: text.substring(0, 50), duration, rows: rows.length });
+    return { rows, rowCount: rows.length };
   }
+
   const start = Date.now();
   try {
-    const res = await pool.query(text, params);
+    const res = await pool.query(text, params || []);
     const duration = Date.now() - start;
     console.log('[POSTGRES] Executed query', { text: text.substring(0, 50), duration, rows: res.rowCount });
     return res;
@@ -54,18 +65,30 @@ export const query = async (text, params) => {
   }
 };
 
-export const get = async (text, params) => {
-  const res = await query(text, params);
+export const get = async (text, ...params) => {
+  const flattenedParams = params.flat();
+  if (!pool) {
+    return sqlite.get(text, flattenedParams);
+  }
+  const res = await query(text, flattenedParams);
   return res.rows[0] || null;
 };
 
-export const all = async (text, params) => {
-  const res = await query(text, params);
+export const all = async (text, ...params) => {
+  const flattenedParams = params.flat();
+  if (!pool) {
+    return sqlite.all(text, flattenedParams);
+  }
+  const res = await query(text, flattenedParams);
   return res.rows;
 };
 
-export const run = async (text, params) => {
-  const res = await query(text, params);
+export const run = async (text, ...params) => {
+  const flattenedParams = params.flat();
+  if (!pool) {
+    return sqlite.run(text, flattenedParams);
+  }
+  const res = await query(text, flattenedParams);
   return {
     lastID: res.rows[0]?.id || null,
     changes: res.rowCount
@@ -73,6 +96,10 @@ export const run = async (text, params) => {
 };
 
 export const exec = async (text) => {
+  if (!pool) {
+    // SQLite doesn't have a direct exec in our provider but we can simulate
+    return sqlite.run(text);
+  }
   return query(text);
 };
 

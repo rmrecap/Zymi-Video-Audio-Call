@@ -20,7 +20,7 @@ export const requireAuth = async (req, res, next) => {
 
   try {
     // Fetch user with settings
-    const user = await db.get('SELECT id, username, role, is_banned, token_version, notification_sound, call_ringtone, theme, online_visibility, read_receipt FROM users WHERE id = ?', userId);
+    const user = await db.get('SELECT id, username, role, is_banned, token_version, notification_sound, call_ringtone, theme, online_visibility, read_receipt FROM users WHERE id = $1', userId);
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
@@ -69,7 +69,7 @@ export const requireAdmin = async (req, res, next) => {
 
   const userId = decoded.userId;
   try {
-    const user = await db.get('SELECT id, username, role, is_banned, token_version FROM users WHERE id = ?', userId);
+    const user = await db.get('SELECT id, username, role, is_banned, token_version FROM users WHERE id = $1', userId);
 
     if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
       return res.status(403).json({ error: 'Admin access required' });
@@ -139,7 +139,7 @@ export const getUserPermissions = (role) => {
 
 export const isUserBanned = async (userId) => {
   try {
-    const user = await db.get('SELECT is_banned FROM users WHERE id = ?', userId);
+    const user = await db.get('SELECT is_banned FROM users WHERE id = $1', userId);
     return user ? !!user.is_banned : false;
   } catch (err) {
     return false;

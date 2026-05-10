@@ -23,7 +23,7 @@ export const SocketProvider = ({ children, user }) => {
     }
 
     setConnectionStatus('connecting');
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || (location.hostname === 'localhost' ? 'http://localhost:5000' : '');
+    const socketUrl = import.meta.env.VITE_SOCKET_URL ?? '';
     const token = user?.token || null;
     
     const newSocket = io(socketUrl, {

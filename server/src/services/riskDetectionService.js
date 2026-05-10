@@ -76,7 +76,7 @@ export const detectRisks = async () => {
   } catch (err) {}
 
   // 6. Connectivity Security (Phase 59)
-  const plainTurnCreds = await get("SELECT count(*) as count FROM turn_servers WHERE credential_encrypted NOT LIKE 'enc:%'");
+  const plainTurnCreds = await get("SELECT count(*) as count FROM turn_servers WHERE credential NOT LIKE 'enc:%'");
   if (parseInt(plainTurnCreds?.count || 0) > 0) {
     risks.push({
       risk_type: 'SECURITY_VULNERABILITY',

@@ -1,3 +1,3 @@
 class AppConfig {
-  static const String apiUrl = 'http://localhost:5000';
+  static const String apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://localhost:5001');
 }

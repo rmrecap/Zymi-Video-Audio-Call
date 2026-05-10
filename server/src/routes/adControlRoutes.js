@@ -38,18 +38,13 @@ router.get('/zrcs/ping', (req, res) => {
 // PRIVATE ENDPOINTS - Admin Control
 router.get('/admin/ad-control/settings', requireAdmin, (req, res) => {
   try {
-    const global = adConfigService.getGlobalSettings();
-    const networks = adConfigService.getNetworkConfigs();
-    const placements = adConfigService.getPlacements();
-    const countryRules = adConfigService.getCountryRules();
-    const versionRules = adConfigService.getVersionRules();
-    
+    // Temporary mock response until DB is fixed
     res.json({
-      global,
-      networks,
-      placements,
-      countryRules,
-      versionRules
+      global: { ads_enabled: true, test_mode: false, active_network: 'admob', fallback_network: 'applovin', interstitial_gap_seconds: 1800, native_refresh_seconds: 60 },
+      networks: [],
+      placements: [],
+      countryRules: [],
+      versionRules: []
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

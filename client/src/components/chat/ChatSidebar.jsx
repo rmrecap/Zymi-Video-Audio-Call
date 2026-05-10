@@ -15,7 +15,7 @@ function ChatSidebar({ currentUser, users, selectedUser, searchQuery, onSearchCh
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const filteredUsers = users.filter(u => !searchQuery || u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredUsers = users.filter(u => !searchQuery || (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <div className="sidebar">

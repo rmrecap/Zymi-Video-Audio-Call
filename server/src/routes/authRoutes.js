@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { db } from '../db/db_provider.js';
+import { get, run } from '../db/postgres.js';
 import { createToken } from '../services/sessionService.js';
 import { logAudit } from '../services/auditService.js';
 import { requestEmailOTP, verifyEmailOTP } from '../services/otpService.js';
@@ -14,11 +14,11 @@ export const register = async (req, res) => {
 
   try {
     const hash = bcrypt.hashSync(password, 12);
-    const result = await db.run(
+    const result = await run(
       'INSERT INTO users (username, email, password_hash, role, profile_completion) VALUES ($1, $2, $3, $4, $5) RETURNING id', 
       username, email, hash, 'user', 40
     );
-    const user = await db.get('SELECT id, username, email, role, token_version FROM users WHERE id = $1', result.lastID);
+    const user = await get('SELECT id, username, email, role, token_version FROM users WHERE id = $1', result.lastID);
     const token = createToken(user);
     
     // Mask email for auditing
@@ -44,7 +44,7 @@ export const login = async (req, res) => {
 
   try {
     console.log('[AUTH] Querying database for user...');
-    const user = await db.get('SELECT * FROM users WHERE username = $1 OR email = $2', username, username);
+    const user = await get('SELECT * FROM users WHERE username = $1 OR email = $2', username, username);
     
     if (!user) {
       console.log('[AUTH] User not found');
@@ -64,7 +64,7 @@ export const login = async (req, res) => {
 
     console.log('[AUTH] Login successful, creating token...');
     try {
-      await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', user.id);
+      await run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', user.id);
     } catch (updateErr) {
       console.warn('[AUTH] Could not update last_login_at (column might be missing):', updateErr.message);
     }
@@ -91,7 +91,7 @@ export const logout = async (req, res) => {
 };
 
 export const me = async (req, res) => {
-  const user = await db.get(`
+  const user = await get(`
     SELECT id, username, email, role, email_verified, phone_verified, 
            profile_completion, country_code, country_name, phone_country_iso, 
            phone_normalized, verification_status, last_login_at, avatar
@@ -106,7 +106,7 @@ export const forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const user = await db.get('SELECT id, email FROM users WHERE email = $1', email);
+  const user = await get('SELECT id, email FROM users WHERE email = $1', email);
   if (!user) {
     // Return success anyway to prevent user enumeration
     return res.json({ success: true, message: 'If email exists, OTP sent.' });
@@ -124,14 +124,14 @@ export const resetPassword = async (req, res) => {
   const { email, otp, newPassword } = req.body;
   if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields required' });
 
-  const user = await db.get('SELECT id FROM users WHERE email = $1', email);
+  const user = await get('SELECT id FROM users WHERE email = $1', email);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const verify = await verifyEmailOTP(user.id, otp);
   if (!verify.success) return res.status(400).json({ error: verify.error });
 
   const hash = bcrypt.hashSync(newPassword, 12);
-  await db.run('UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2', hash, user.id);
+  await run('UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2', hash, user.id);
   
   await logAudit(user.id, 'password_reset', user.id, 'User reset password via OTP');
   res.json({ success: true, message: 'Password updated successfully' });
@@ -144,7 +144,7 @@ export const adminLogin = async (req, res) => {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
-  const admin = await db.get('SELECT * FROM users WHERE (username = $1 OR email = $2) AND role IN ($3, $4)', username, username, 'admin', 'super_admin');
+  const admin = await get('SELECT * FROM users WHERE (username = $1 OR email = $2) AND role IN ($3, $4)', username, username, 'admin', 'super_admin');
 
   if (!admin) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
@@ -154,7 +154,7 @@ export const adminLogin = async (req, res) => {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
-  await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', admin.id);
+  await run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', admin.id);
 
   const token = createToken(admin);
   res.json({

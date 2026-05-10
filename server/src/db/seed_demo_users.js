@@ -17,24 +17,16 @@ export const seedDemoUsers = async () => {
 
   for (const user of demoUsers) {
     try {
-      const existing = await db.get('SELECT id FROM users WHERE email = ?', user.email);
+      const existing = await db.get('SELECT id FROM users WHERE email = $1', user.email);
       if (!existing) {
         const hash = bcrypt.hashSync('demo123', 12);
         
-        // Using PostGIS syntax for PostgreSQL and simple lat/lng for SQLite fallback
-        if (process.env.DATABASE_URL) {
-          await db.run(
-            `INSERT INTO users (username, email, password_hash, role, location) 
-             VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))`,
-            user.username, user.email, hash, 'user', user.lng, user.lat
-          );
-        } else {
-          // SQLite fallback (no PostGIS)
-          await db.run(
-            'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
-            user.username, user.email, hash, 'user'
-          );
-        }
+        // Using PostGIS syntax for PostgreSQL
+        await db.run(
+          `INSERT INTO users (username, email, password_hash, role, location) 
+           VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))`,
+          user.username, user.email, hash, 'user', user.lng, user.lat
+        );
         console.log(`[SEED] Created demo user: ${user.username}`);
       }
     } catch (err) {

@@ -30,6 +30,7 @@ const indexExists = async (indexName) => {
 
 export const runMigrations = async () => {
   console.log('[MIGRATION] Starting PostgreSQL database migrations...');
+  // await exec('CREATE EXTENSION IF NOT EXISTS postgis'); // PostGIS not installed
 
   // ─── USERS ────────────────────────────────────────────────────────────────
   await exec(`
@@ -71,6 +72,9 @@ export const runMigrations = async () => {
   if (!(await indexExists('idx_users_email'))) {
     await exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL');
   }
+  // if (!(await indexExists('idx_users_location'))) {
+  //   await exec('CREATE INDEX IF NOT EXISTS idx_users_location ON users USING GIST(location)');
+  // }
   console.log('[MIGRATION] users table ready');
 
   // ─── MESSAGES ─────────────────────────────────────────────────────────────
@@ -104,13 +108,16 @@ export const runMigrations = async () => {
       metadata TEXT
     )
   `);
-  if (!(await indexExists('idx_messages_conversation'))) {
-    await exec('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)');
+if (!(await indexExists('idx_messages_conversation'))) {
+    try {
+      await exec('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)');
+    } catch (e) {
+      console.log('[MIGRATION] Skipping conversation_id index - column may not exist');
+    }
   }
   if (!(await indexExists('idx_messages_client_id'))) {
     await exec('CREATE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id)');
   }
-  console.log('[MIGRATION] messages table ready');
 
   // ─── ADMIN AUDIT LOGS ─────────────────────────────────────────────────────
   await exec(`

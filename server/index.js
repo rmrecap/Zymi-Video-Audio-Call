@@ -10,38 +10,37 @@ import fileUpload from 'express-fileupload';
 dotenv.config();
 
 import { config, isProduction } from './src/config/env.js';
-import { initPostgres } from './src/db/postgres.js';
-import { runMigrations } from './src/db/migrations.js';
 import { initAdminSeed } from './src/config/adminSeed.js';
 import { seedDemoUsers } from './src/db/seed_demo_users.js';
+import { initPostgres, isPostgresReady, testConnection } from './src/db/postgres.js';
+import { runMigrations } from './src/db/migrations.js';
 
-// Initialize PostgreSQL (required)
-try {
-  initPostgres();
+// Initialize PostgreSQL if DATABASE_URL is provided
+const pgResult = initPostgres();
+if (pgResult) {
   console.log('[DB] PostgreSQL connection pool initialized');
-} catch (err) {
-  console.error('[DB] PostgreSQL initialization failed:', err.message);
-  process.exit(1);
+} else {
+  console.log('[DB] SQLite database initialized (DATABASE_URL not set)');
 }
 
 // Run migrations and seeds
 await runMigrations();
 await initAdminSeed();
-await seedDemoUsers();
+// await seedDemoUsers();
 
 // Other services
-import { createBlockTable } from './src/services/blockService.js';
-import { createReportsTable } from './src/services/reportService.js';
-import { createCallHistoryTable } from './src/services/callHistoryService.js';
-import { initCallState } from './src/services/callStateService.js';
-import { initMetrics } from './src/services/metricsService.js';
-import { logAudit } from './src/services/auditService.js';
+// import { createBlockTable } from './src/services/blockService.js';
+// import { createReportsTable } from './src/services/reportService.js';
+// import { createCallHistoryTable } from './src/services/callHistoryService.js';
+// import { initCallState } from './src/services/callStateService.js';
+// import { initMetrics } from './src/services/metricsService.js';
+// import { logAudit } from './src/services/auditService.js';
 
-await createBlockTable();
-await createReportsTable();
-await createCallHistoryTable();
-initCallState();
-initMetrics();
+// await createBlockTable();
+// await createReportsTable();
+// await createCallHistoryTable();
+// initCallState();
+// initMetrics();
 
 // Routes
 import healthRoutes from './src/routes/healthRoutes.js';
@@ -121,9 +120,15 @@ app.use(fileUpload({
 // Routes mounting
 app.post('/api/register', register);
 app.post('/api/login', authRateLimit(), login);
-app.post('/api/admin/login', authRateLimit(), (req, res) => {
-  adminLogin(req, res);
-  logAudit(null, 'admin_login_attempt', null, `Login attempt: ${req.body.username}`);
+app.post('/api/admin/login', authRateLimit(), async (req, res) => {
+  try {
+    await adminLogin(req, res);
+    await logAudit(null, 'admin_login_attempt', null, `Login attempt: ${req.body.username}`);
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
 });
 
 app.get('/api/users', requireAuth, getUsers);

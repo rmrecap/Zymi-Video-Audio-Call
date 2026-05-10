@@ -16,7 +16,7 @@ const PremiumChatSidebar = ({
   onViewChange = () => {}
 }) => {
   const filteredUsers = users.filter(user =>
-    (user.name || user.username).toLowerCase().includes(searchQuery.toLowerCase())
+    ((user.name || user.username) || '').toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   const renderLastMessage = (user) => {

@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { db } from '../db/db_provider.js';
+import { get, all, run } from '../db/postgres.js';
 import { logAudit, getAuditLogs, getAuditStats } from '../services/auditService.js';
 import { getMetricsSummary } from '../services/metricsService.js';
 import { incrementTokenVersion } from '../services/sessionService.js';
@@ -13,22 +13,22 @@ let serverStartTime = Date.now();
 
 export const getStats = async (req, res) => {
   try {
-    const userCount = await db.get('SELECT COUNT(*) as count FROM users');
-    const messageCount = await db.get('SELECT COUNT(*) as count FROM messages');
+    const userCount = await get('SELECT COUNT(*) as count FROM users');
+    const messageCount = await get('SELECT COUNT(*) as count FROM messages');
     const today = new Date().toISOString().split('T')[0];
-    const messagesToday = await db.get("SELECT COUNT(*) as count FROM messages WHERE timestamp::date = $1", today);
-    const callsToday = await db.get("SELECT COUNT(*) as count FROM admin_audit_logs WHERE action = 'call_started' AND timestamp::date = $1", today);
+    const messagesToday = await get("SELECT COUNT(*) as count FROM messages WHERE created_at::date = $1", today);
+    const callsToday = await get("SELECT COUNT(*) as count FROM call_history WHERE started_at::date = $1", today);
     const activeConnections = req.app.get('userSockets')?.size || 0;
     const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
     const dbStatus = 'healthy';
-    
+
     const metrics = getMetricsSummary();
-    
+
     res.json({
-      totalUsers: parseInt(userCount.count),
-      totalMessages: parseInt(messageCount.count),
-      messagesToday: parseInt(messagesToday.count),
-      callsToday: parseInt(callsToday.count),
+      totalUsers: userCount?.count || 0,
+      totalMessages: messageCount?.count || 0,
+      messagesToday: messagesToday?.count || 0,
+      callsToday: callsToday?.count || 0,
       failedCallsToday: metrics.failedCallsToday,
       activeConnections,
       activeCalls: callActivity.activeCalls,
@@ -38,8 +38,8 @@ export const getStats = async (req, res) => {
       metrics
     });
   } catch (err) {
-    console.error('[ADMIN] Stats error:', err);
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    console.error('[ADMIN] Stats error:', err.message, err.stack);
+    res.status(500).json({ error: 'Failed to fetch stats', details: err.message });
   }
 };
 
@@ -68,7 +68,7 @@ export const getUsers = async (req, res) => {
   query += ' ORDER BY created_at DESC';
   
   try {
-    const users = await db.all(query, ...params);
+    const users = await all(query, ...params);
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -83,7 +83,7 @@ export const banUser = async (req, res) => {
   }
   
   try {
-    const user = await db.get('SELECT * FROM users WHERE id = $1', userId);
+    const user = await get('SELECT * FROM users WHERE id = $1', userId);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -93,7 +93,7 @@ export const banUser = async (req, res) => {
       return res.status(403).json({ error: 'Cannot ban admin' });
     }
     
-    await db.run('UPDATE users SET is_banned = TRUE, banned_at = NOW() WHERE id = $1', userId);
+    await run('UPDATE users SET is_banned = TRUE, banned_at = NOW() WHERE id = $1', userId);
     
     logAudit(req.adminUser.id, 'ban_user', userId, reason || 'No reason provided');
     
@@ -120,7 +120,7 @@ export const unbanUser = async (req, res) => {
   }
   
   try {
-    await db.run('UPDATE users SET is_banned = FALSE, banned_at = NULL WHERE id = $1', userId);
+    await run('UPDATE users SET is_banned = FALSE, banned_at = NULL WHERE id = $1', userId);
     logAudit(req.adminUser.id, 'unban_user', userId, 'User unbanned');
     res.json({ success: true, message: 'User unbanned successfully' });
   } catch (err) {
@@ -139,7 +139,7 @@ export const getAudit = async (req, res) => {
       a.target_user_id,
       a.details,
       a.ip_address,
-      a.timestamp,
+      a.created_at as timestamp,
       u.username as admin_username,
       t.username as target_username
     FROM admin_audit_logs a
@@ -161,20 +161,20 @@ export const getAudit = async (req, res) => {
   }
 
   if (startDate) {
-    query += ` AND a.timestamp >= $${paramIndex++}`;
+    query += ` AND a.created_at >= $${paramIndex++}`;
     params.push(startDate);
   }
 
   if (endDate) {
-    query += ` AND a.timestamp <= $${paramIndex++}`;
+    query += ` AND a.created_at <= $${paramIndex++}`;
     params.push(endDate);
   }
 
-  query += ` ORDER BY a.timestamp DESC LIMIT $${paramIndex++}`;
+  query += ` ORDER BY a.created_at DESC LIMIT $${paramIndex++}`;
   params.push(parseInt(limit));
 
   try {
-    const logs = await db.all(query, ...params);
+    const logs = await all(query, ...params);
     res.json(logs);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch audit logs' });
@@ -186,7 +186,7 @@ export const getRisks = async (req, res) => {
     const risks = [];
     const recommendations = [];
 
-    const bannedUsers = await db.get('SELECT COUNT(*) as count FROM users WHERE is_banned = TRUE');
+    const bannedUsers = await get('SELECT COUNT(*) as count FROM users WHERE is_banned = TRUE');
     if (bannedUsers.count > 0) {
       risks.push({ level: 'info', message: `${bannedUsers.count} banned user(s) in system` });
       recommendations.push({ action: 'review_banned_users', description: 'Review banned accounts for potential unbanning or data cleanup' });
@@ -198,10 +198,10 @@ export const getRisks = async (req, res) => {
       recommendations.push({ action: 'check_server_status', description: 'Verify server is running and accessible' });
     }
 
-    const inactiveUsers = await db.get(`
+    const inactiveUsers = await get(`
       SELECT COUNT(*) as count FROM users
-      WHERE id NOT IN (SELECT DISTINCT sender_id FROM messages WHERE timestamp > NOW() - INTERVAL '24 hours')
-      AND id NOT IN (SELECT DISTINCT receiver_id FROM messages WHERE timestamp > NOW() - INTERVAL '24 hours')
+      WHERE id NOT IN (SELECT DISTINCT sender_id FROM messages WHERE created_at > NOW() - INTERVAL '1 day')
+      AND id NOT IN (SELECT DISTINCT receiver_id FROM messages WHERE created_at > NOW() - INTERVAL '1 day')
     `);
 
     if (inactiveUsers.count > 5) {
@@ -220,8 +220,8 @@ export const getRisks = async (req, res) => {
       recommendations.push({ action: 'review_security', description: 'Consider implementing rate limiting or IP blocking' });
     }
 
-    // Table status check for Postgres
-    const tableCheck = await db.all("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
+    // Table status check for PostgreSQL
+    const tableCheck = await all("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
     const tableNames = tableCheck.map(t => t.table_name);
     const requiredTables = ['users', 'messages', 'admin_audit_logs', 'call_history', 'blocked_users', 'message_reports'];
     const missingTables = requiredTables.filter(t => !tableNames.includes(t));
@@ -232,8 +232,8 @@ export const getRisks = async (req, res) => {
 
     res.json({ risks, recommendations });
   } catch (err) {
-    console.error('[ADMIN] Risks error:', err);
-    res.status(500).json({ error: 'Failed to fetch risks' });
+    console.error('[ADMIN] Risks error:', err.message, err.stack);
+    res.status(500).json({ error: 'Failed to fetch risks', details: err.message });
   }
 };
 
@@ -251,7 +251,7 @@ export const updateUserRole = async (req, res) => {
   }
   
   try {
-    const user = await db.get('SELECT * FROM users WHERE id = $1', userId);
+    const user = await get('SELECT * FROM users WHERE id = $1', userId);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -265,7 +265,7 @@ export const updateUserRole = async (req, res) => {
       return res.status(403).json({ error: 'Only super_admin can assign super_admin role' });
     }
     
-    await db.run('UPDATE users SET role = $1 WHERE id = $2', newRole, userId);
+    await run('UPDATE users SET role = $1 WHERE id = $2', newRole, userId);
     logAudit(req.adminUser.id, 'role_change', userId, `Changed role from ${user.role} to ${newRole}`);
     res.json({ success: true, message: 'Role updated successfully' });
   } catch (err) {
@@ -285,14 +285,14 @@ export const changePassword = async (req, res) => {
   }
 
   try {
-    const admin = await db.get('SELECT * FROM users WHERE id = $1', req.adminUser.id);
+    const admin = await get('SELECT * FROM users WHERE id = $1', req.adminUser.id);
 
     if (!admin || !bcrypt.compareSync(currentPassword, admin.password_hash)) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
     const hash = bcrypt.hashSync(newPassword, 12);
-    await db.run('UPDATE users SET password_hash = $1 WHERE id = $2', hash, req.adminUser.id);
+    await run('UPDATE users SET password_hash = $1 WHERE id = $2', hash, req.adminUser.id);
 
     incrementTokenVersion(req.adminUser.id);
     logAudit(req.adminUser.id, 'password_change', req.adminUser.id, 'Admin changed password');
@@ -315,7 +315,7 @@ export const changePassword = async (req, res) => {
 export const getMigrationStatus = async (req, res) => {
   try {
     const migrations = [];
-    const tableCheck = await db.all("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
+    const tableCheck = await all("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
     const tableNames = tableCheck.map(t => t.table_name);
     
     migrations.push({ name: 'users table', exists: tableNames.includes('users') });
@@ -323,7 +323,7 @@ export const getMigrationStatus = async (req, res) => {
     migrations.push({ name: 'admin_audit_logs table', exists: tableNames.includes('admin_audit_logs') });
     
     if (tableNames.includes('users')) {
-      const userCols = await db.all("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'");
+      const userCols = await all("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'");
       const colNames = userCols.map(c => c.column_name);
       migrations.push({ name: 'users.role column', exists: colNames.includes('role') });
       migrations.push({ name: 'users.is_banned column', exists: colNames.includes('is_banned') });
@@ -342,7 +342,7 @@ export const exportData = async (req, res) => {
 
   for (const table of allowedTables) {
     try {
-      const rows = await db.all(`SELECT * FROM ${table}`);
+      const rows = await all(`SELECT * FROM ${table}`);
       data[table] = rows.map(row => {
         const sanitized = { ...row };
         if (table === 'users') {
@@ -386,19 +386,19 @@ export const exportData = async (req, res) => {
 
 export const getMessageHealth = async (req, res) => {
   try {
-    const totalMessages = (await db.get('SELECT COUNT(*) as count FROM messages')).count;
-    const messagesToday = (await db.get("SELECT COUNT(*) as count FROM messages WHERE timestamp::date = CURRENT_DATE")).count;
-    const messagesLast7Days = (await db.get("SELECT COUNT(*) as count FROM messages WHERE timestamp > NOW() - INTERVAL '7 days'")).count;
-    const reportedMessages = (await db.get('SELECT COUNT(*) as count FROM message_reports')).count;
+    const totalMessages = (await get('SELECT COUNT(*) as count FROM messages')).count;
+    const messagesToday = (await get("SELECT COUNT(*) as count FROM messages WHERE created_at::date = CURRENT_DATE")).count;
+    const messagesLast7Days = (await get("SELECT COUNT(*) as count FROM messages WHERE created_at > NOW() - INTERVAL '7 days'")).count;
+    const reportedMessages = (await get('SELECT COUNT(*) as count FROM message_reports')).count;
 
-    const blockedMessageRisk = (await db.get(`
+    const blockedMessageRisk = (await get(`
       SELECT COUNT(*) as count FROM messages
       WHERE sender_id IN (SELECT id FROM users WHERE is_banned = TRUE)
       OR receiver_id IN (SELECT id FROM users WHERE is_banned = TRUE)
     `)).count;
 
     const persistenceStatus = 'healthy';
-    const latestMessage = await db.get('SELECT MAX(timestamp) as latest FROM messages');
+    const latestMessage = await get('SELECT MAX(created_at) as latest FROM messages');
     const latestMessageAt = latestMessage.latest;
 
     const healthScore = totalMessages > 0 ? Math.max(0, 100 - Math.round((parseInt(reportedMessages) / parseInt(totalMessages)) * 100)) : 100;
@@ -426,23 +426,23 @@ export const getMessageHealth = async (req, res) => {
 
 export const getCallHealth = async (req, res) => {
   try {
-    const totalCallsResult = await db.get('SELECT COUNT(*) as count FROM call_history');
+    const totalCallsResult = await get('SELECT COUNT(*) as count FROM call_history');
     const totalCalls = totalCallsResult?.count || 0;
     
-    const callsTodayResult = await db.get("SELECT COUNT(*) as count FROM call_history WHERE started_at::date = CURRENT_DATE");
+    const callsTodayResult = await get("SELECT COUNT(*) as count FROM call_history WHERE started_at::date = CURRENT_DATE");
     const callsToday = callsTodayResult?.count || 0;
-    
-    const callsLast7DaysResult = await db.get("SELECT COUNT(*) as count FROM call_history WHERE started_at > NOW() - INTERVAL '7 days'");
+
+    const callsLast7DaysResult = await get("SELECT COUNT(*) as count FROM call_history WHERE started_at > NOW() - INTERVAL '7 days'");
     const callsLast7Days = callsLast7DaysResult?.count || 0;
 
-    const failedCallsTodayResult = await db.get("SELECT COUNT(*) as count FROM admin_audit_logs WHERE action = 'call_failed' AND timestamp::date = CURRENT_DATE");
+    const failedCallsTodayResult = await get("SELECT COUNT(*) as count FROM admin_audit_logs WHERE action = 'call_failed' AND created_at::date = CURRENT_DATE");
     const failedCallsToday = failedCallsTodayResult?.count || 0;
 
     const callActivity = req.app.get('callActivity') || { activeCalls: 0 };
     const activeCalls = callActivity.activeCalls || 0;
 
     let averageCallDuration = 0;
-    const avgResult = await db.get('SELECT AVG(duration) as avg FROM call_history WHERE duration IS NOT NULL AND duration > 0');
+    const avgResult = await get('SELECT AVG(duration_seconds) as avg FROM call_history WHERE duration_seconds IS NOT NULL AND duration_seconds > 0');
     if (avgResult && avgResult.avg !== null) {
       averageCallDuration = Math.round(avgResult.avg);
     }
@@ -454,7 +454,7 @@ export const getCallHealth = async (req, res) => {
       warnings.push('Call duration tracking is empty');
     }
 
-    const lastCall = await db.get('SELECT started_at FROM call_history ORDER BY started_at DESC LIMIT 1');
+    const lastCall = await get('SELECT started_at FROM call_history ORDER BY started_at DESC LIMIT 1');
 
     res.json({
       ok: true,
@@ -525,11 +525,11 @@ export const getSocketRegistryHealth = (req, res) => {
 
 export const getAiAnalysis = async (req, res) => {
   try {
-    const userCount = await db.get('SELECT COUNT(*) as count FROM users');
-    const messageCount = await db.get('SELECT COUNT(*) as count FROM messages');
+    const userCount = await get('SELECT COUNT(*) as count FROM users');
+    const messageCount = await get('SELECT COUNT(*) as count FROM messages');
     const today = new Date().toISOString().split('T')[0];
-    const messagesToday = await db.get(
-      'SELECT COUNT(*) as count FROM messages WHERE timestamp::date = $1', today
+    const messagesToday = await get(
+      'SELECT COUNT(*) as count FROM messages WHERE created_at::date = $1', today
     );
     const metrics = getMetricsSummary();
     const activeConnections = req.app.get('userSockets')?.size || 0;

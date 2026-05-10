@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middleware/authMiddleware.js';
-import { db } from '../db/db_provider.js';
+import { get, all, run } from '../db/postgres.js';
 import * as featureFlagService from '../services/featureFlagService.js';
 
 const router = express.Router();
@@ -12,7 +12,7 @@ router.get('/users', requireAuth, async (req, res) => {
     
     // Using PostGIS for high-performance proximity search as defined in ddl.sql (idx_users_location)
     // We filter out the current user and banned users
-    const nearbyUsers = await db.all(`
+    const nearbyUsers = await all(`
       SELECT 
         id, username, avatar_url as avatar, 
         ST_X(location::geometry) as lng, 

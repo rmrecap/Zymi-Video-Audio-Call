@@ -1,23 +1,11 @@
 /**
- * db_provider.js — Pure PostgreSQL wrapper
- * SQLite fallback has been completely removed.
+ * db_provider.js — Bridge to postgres.js (handles PostgreSQL with SQLite fallback)
  */
-import { query as pgQuery, get, all, run } from './postgres.js';
+import * as postgres from './postgres.js';
 
 export const db = {
-  get: async (sql, ...params) => {
-    return await get(sql, params.flat());
-  },
-
-  all: async (sql, ...params) => {
-    return await all(sql, params.flat());
-  },
-
-  run: async (sql, ...params) => {
-    const res = await run(sql, params.flat());
-    return {
-      lastID: res.lastID,
-      changes: res.changes
-    };
-  }
+  get: (sql, ...params) => postgres.get(sql, ...params),
+  all: (sql, ...params) => postgres.all(sql, ...params),
+  run: (sql, ...params) => postgres.run(sql, ...params),
+  exec: (sql) => postgres.exec(sql)
 };
