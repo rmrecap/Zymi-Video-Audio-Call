@@ -41,7 +41,7 @@ router.post('/update-location', requireAuth, async (req, res) => {
     const { lat, lng } = req.body;
     
     // Update user's location using PostGIS Point geometry
-    await db.run(`
+    await run(`
       UPDATE users 
       SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
           last_location_update = NOW()

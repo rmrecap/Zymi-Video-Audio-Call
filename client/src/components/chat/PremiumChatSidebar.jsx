@@ -13,6 +13,7 @@ const PremiumChatSidebar = ({
   unreadCounts,
   currentUser,
   activeView = 'chats',
+  onLogout = () => {},
   onViewChange = () => {}
 }) => {
   const filteredUsers = users.filter(user =>
@@ -52,11 +53,26 @@ const PremiumChatSidebar = ({
             <p className="zy-profile-status">Premium Chat</p>
           </div>
         </div>
-        <button className="zy-new-chat-btn" title="New Message">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
-        </button>
+        <div className="zy-header-actions" style={{ display: 'flex', gap: '8px' }}>
+          <button className="zy-new-chat-btn" title="New Message">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+          <button className="zy-logout-btn" title="Logout" onClick={onLogout} style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: 'none',
+            borderRadius: '10px',
+            color: '#ef4444',
+            padding: '8px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="zy-sidebar-search">

@@ -78,6 +78,10 @@ export const setupChatSocket = (io, userSockets) => {
           socket.broadcast.emit(SOCKET_EVENTS.USER_ONLINE, { userId: String(userId) });
         }
 
+        // Phase 99: Send list of currently online users to the joining user
+        const onlineUserIds = Array.from(userSockets.keys());
+        socket.emit('online-users-list', { userIds: onlineUserIds });
+
         console.log('[SOCKET] User joined:', userId);
       } catch (err) {
         console.error('[CHAT_SOCKET] JOIN error:', err);

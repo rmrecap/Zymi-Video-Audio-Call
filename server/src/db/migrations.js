@@ -30,7 +30,12 @@ const indexExists = async (indexName) => {
 
 export const runMigrations = async () => {
   console.log('[MIGRATION] Starting PostgreSQL database migrations...');
-  // await exec('CREATE EXTENSION IF NOT EXISTS postgis'); // PostGIS not installed
+  try {
+    await exec('CREATE EXTENSION IF NOT EXISTS postgis');
+    console.log('[MIGRATION] PostGIS extension enabled');
+  } catch (e) {
+    console.warn('[MIGRATION] PostGIS extension could not be enabled. Nearby features may fail:', e.message);
+  }
 
   // ─── USERS ────────────────────────────────────────────────────────────────
   await exec(`
@@ -63,6 +68,8 @@ export const runMigrations = async () => {
       phone_country_iso TEXT,
       verification_status TEXT DEFAULT 'pending',
       last_login_at TIMESTAMP,
+      location GEOMETRY(Point, 4326),
+      last_location_update TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -76,6 +83,18 @@ export const runMigrations = async () => {
   //   await exec('CREATE INDEX IF NOT EXISTS idx_users_location ON users USING GIST(location)');
   // }
   console.log('[MIGRATION] users table ready');
+  
+  // Ensure necessary columns exist
+  try {
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS location GEOMETRY(Point, 4326)');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_location_update TIMESTAMP');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS country_code TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS country_name TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS city_name TEXT');
+    console.log('[MIGRATION] users table columns verified');
+  } catch (e) {
+    console.warn('[MIGRATION] Could not verify/add columns to users:', e.message);
+  }
 
   // ─── MESSAGES ─────────────────────────────────────────────────────────────
   await exec(`

@@ -14,11 +14,11 @@ async function seed() {
   const passwordHash = await bcrypt.hash('password123', 10);
   
   const users = [
-    { username: 'ahmed_dxb', email: 'ahmed@zymi.ae', phone: '+971501234567', role: 'user', lat: 25.2754, lng: 55.3216, city: 'Dubai' },
-    { username: 'sarah_marina', email: 'sarah@zymi.ae', phone: '+971502345678', role: 'user', lat: 25.0805, lng: 55.1403, city: 'Dubai Marina' },
-    { username: 'omar_downtown', email: 'omar@zymi.ae', phone: '+971503456789', role: 'user', lat: 25.1972, lng: 55.2744, city: 'Downtown Dubai' },
-    { username: 'fatima_palm', email: 'fatima@zymi.ae', phone: '+971504567890', role: 'user', lat: 25.1124, lng: 55.1390, city: 'Palm Jumeirah' },
-    { username: 'admin_khalid', email: 'khalid_admin@zymi.ae', phone: '+971505678901', role: 'admin', lat: 25.2676, lng: 55.3180, city: 'Deira' },
+    { username: 'ahmed_dxb', email: 'ahmed@zymi.ae', phone: '+971501234567', role: 'user', lat: 25.2754, lng: 55.3216, city: 'Dubai', countryCode: 'AE', countryName: 'United Arab Emirates' },
+    { username: 'sarah_marina', email: 'sarah@zymi.ae', phone: '+971502345678', role: 'user', lat: 25.0805, lng: 55.1403, city: 'Dubai Marina', countryCode: 'AE', countryName: 'United Arab Emirates' },
+    { username: 'omar_downtown', email: 'omar@zymi.ae', phone: '+971503456789', role: 'user', lat: 25.1972, lng: 55.2744, city: 'Downtown Dubai', countryCode: 'AE', countryName: 'United Arab Emirates' },
+    { username: 'fatima_palm', email: 'fatima@zymi.ae', phone: '+971504567890', role: 'user', lat: 25.1124, lng: 55.1390, city: 'Palm Jumeirah', countryCode: 'AE', countryName: 'United Arab Emirates' },
+    { username: 'admin_khalid', email: 'khalid_admin@zymi.ae', phone: '+971505678901', role: 'admin', lat: 25.2676, lng: 55.3180, city: 'Deira', countryCode: 'AE', countryName: 'United Arab Emirates' },
   ];
 
   for (const u of users) {
@@ -33,7 +33,7 @@ async function seed() {
       );
       const userId = userRes.rows[0].id;
 
-      // 2. Insert Nearby Visibility
+      // 2. Insert Nearby Visibility (Optional redundancy)
       await pool.query(
         `INSERT INTO nearby_visibility (user_id, lat, lng, country_code, city_name, is_active)
          VALUES ($1, $2, $3, 'AE', $4, true)
@@ -41,15 +41,27 @@ async function seed() {
         [userId, u.lat, u.lng, u.city]
       );
 
-      // 3. Insert Location Preferences
+      // 3. Update main users table location and geo info
+      await pool.query(
+        `UPDATE users 
+         SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
+             country_code = $4,
+             country_name = $5,
+             city_name = $6,
+             last_location_update = NOW()
+         WHERE id = $3`,
+        [u.lng, u.lat, userId, u.countryCode, u.countryName, u.city]
+      );
+
+      // 4. Insert Location Preferences
       await pool.query(
         `INSERT INTO user_location_preferences (user_id, discovery_enabled, radius_km, approximate_only)
-         VALUES ($1, true, 10, false)
+         VALUES ($1, true, 50, false)
          ON CONFLICT (user_id) DO UPDATE SET discovery_enabled = true`,
         [userId]
       );
 
-      console.log(`Synced user: ${u.username} (ID: ${userId})`);
+      console.log(`Synced user: ${u.username} (ID: ${userId}) at [${u.lat}, ${u.lng}]`);
     } catch (e) {
       console.error(`Error syncing ${u.username}:`, e.message);
     }

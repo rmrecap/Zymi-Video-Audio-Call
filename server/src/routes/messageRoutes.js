@@ -130,9 +130,26 @@ router.get('/health/messages', requireAuth, async (req, res) => {
 // Backward compatibility or legacy support for the main index.js imports
 export const getUsers = async (req, res) => {
   try {
-    const users = await all('SELECT id, username, avatar, role, is_banned FROM users WHERE id != $1', [req.user.id]);
+    const userId = req.user.id;
+    // Order by latest message time, then username. Users with messages come first.
+    const users = await all(`
+      SELECT 
+        u.id, u.username, u.avatar, u.role, u.is_banned,
+        (SELECT MAX(created_at) FROM messages 
+         WHERE (sender_id = u.id AND receiver_id = $1) OR (sender_id = $2 AND receiver_id = u.id)
+        ) as last_message_time,
+        (SELECT unread_count FROM conversation_states 
+         WHERE user_id = $3 AND conversation_id = 
+           CASE WHEN u.id < $4 THEN u.id::TEXT || '_' || $5::TEXT ELSE $6::TEXT || '_' || u.id::TEXT END
+        ) as unread_count
+      FROM users u 
+      WHERE u.id != $7
+      ORDER BY last_message_time DESC NULLS LAST, u.username ASC
+    `, [userId, userId, userId, userId, userId, userId, userId]);
+    
     res.json(users);
   } catch (err) {
+    console.error('[API] getUsers error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 };

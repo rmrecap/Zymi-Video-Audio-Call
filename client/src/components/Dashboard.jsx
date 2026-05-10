@@ -959,6 +959,7 @@ const handleSelectUser = (u) => {
             unreadCounts={unreadCounts}
             currentUser={user}
             activeView={activeView}
+            onLogout={onLogout}
             onViewChange={(view) => {
               setActiveView(view);
               if (view !== 'chats') setSelectedUser(null);

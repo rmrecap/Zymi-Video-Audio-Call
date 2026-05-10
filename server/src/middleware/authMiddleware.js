@@ -17,6 +17,11 @@ export const requireAuth = async (req, res, next) => {
   }
 
   const userId = decoded.userId;
+  
+  // If we are using SERIAL (INTEGER) IDs, but get a UUID string, it's an old session
+  if (isNaN(parseInt(userId))) {
+     return res.status(401).json({ error: 'Invalid session format. Please log in again.' });
+  }
 
   try {
     // Fetch user with settings
