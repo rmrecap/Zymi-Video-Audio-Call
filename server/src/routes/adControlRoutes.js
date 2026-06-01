@@ -3,6 +3,7 @@ import { requireAdmin } from '../middleware/authMiddleware.js';
 import { adConfigService } from '../services/adConfigService.js';
 import { adConfigSafetyService } from '../services/adConfigSafetyService.js';
 import { adConfigValidator } from '../services/adConfigValidator.js';
+import { run } from '../db/postgres.js';
 
 const router = express.Router();
 
@@ -18,6 +19,26 @@ router.get('/v1/ad-settings', (req, res) => {
   } catch (err) {
     console.error('[ZRCS] App config fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch ad settings' });
+  }
+});
+
+// PUBLIC ENDPOINT - Mobile App Bulk Telemetry
+router.post('/v1/ads/telemetry/bulk', async (req, res) => {
+  const { events } = req.body;
+  if (!Array.isArray(events)) {
+    return res.status(400).json({ error: 'events array is required' });
+  }
+
+  try {
+    await run(
+      'INSERT INTO audit_logs (log_type, data) VALUES ($1, $2)',
+      'AD_TELEMETRY_BULK',
+      JSON.stringify({ count: events.length, events, ip: req.ip })
+    );
+    res.json({ success: true, count: events.length });
+  } catch (err) {
+    console.error('[ZRCS] Ad bulk telemetry log error:', err);
+    res.status(500).json({ error: 'Failed to record telemetry' });
   }
 });
 

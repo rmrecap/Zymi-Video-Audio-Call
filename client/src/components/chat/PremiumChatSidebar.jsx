@@ -14,6 +14,7 @@ const PremiumChatSidebar = ({
   currentUser,
   activeView = 'chats',
   onLogout = () => {},
+  onShowMyProfile = () => {},
   onViewChange = () => {}
 }) => {
   const filteredUsers = users.filter(user =>
@@ -41,7 +42,7 @@ const PremiumChatSidebar = ({
   return (
     <div className="zy-premium-sidebar">
       <div className="zy-sidebar-header">
-        <div className="zy-sidebar-profile">
+        <div className="zy-sidebar-profile" onClick={onShowMyProfile} style={{ cursor: 'pointer' }}>
           <div className="zy-profile-avatar-wrapper">
             <div className="zy-profile-avatar">
               {currentUser.username?.[0].toUpperCase() || 'U'}

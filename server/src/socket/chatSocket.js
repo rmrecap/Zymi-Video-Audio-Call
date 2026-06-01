@@ -2,7 +2,7 @@ import { SOCKET_EVENTS } from '../../shared/socketEvents.js';
 import { get, all, run } from '../db/postgres.js';
 import { incrementMessagesToday, incrementTypingEvents, incrementDisconnects } from '../services/metricsService.js';
 import { shouldBroadcastOnline } from '../services/presenceService.js';
-import { getUserSocketRegistry } from './userSocketRegistry.js';
+import { registry } from './userSocketRegistry.js';
 import { cleanupUserActiveCall } from './callState.js';
 import * as messageQueueService from '../services/messageQueueService.js';
 import * as unreadCounterService from '../services/unreadCounterService.js';
@@ -47,9 +47,21 @@ export const setupChatSocket = (io, userSockets) => {
         socket.tokenVersion = user?.token_version || 1;
         socket.onlineVisibility = user?.online_visibility !== false; // default true
 
+        // Determine socket type from handshake auth (UI or BACKGROUND)
+        const socketType = socket.handshake?.auth?.type || 'UI';
+        socket.socketType = socketType;
+
         // Phase 63: Multi-tab support - join room and set map
         socket.join(normalizedUserId);
         userSockets.set(normalizedUserId, socket.id);
+
+        // Register in production-wired Redis registry (multi-type)
+        try {
+          await registry.register(normalizedUserId, socket.id, socketType);
+          console.log(`[SOCKET] Registered ${socketType} socket for user ${normalizedUserId}`);
+        } catch (regErr) {
+          console.error('[SOCKET] Registry write failed:', regErr.message);
+        }
 
         // Phase 57: Sync pending messages when user joins
         const pendingMessages = messageQueueService.getPendingMessages(normalizedUserId);
@@ -63,16 +75,6 @@ export const setupChatSocket = (io, userSockets) => {
         const unreadTotal = await unreadCounterService.getTotalUnread(normalizedUserId);
         socket.emit('unread-count-updated', { total: unreadTotal });
 
-        // Shadow write to Redis registry (dev-only)
-        if (process.env.REDIS_SOCKET_REGISTRY_SHADOW === 'true' && process.env.NODE_ENV !== 'production') {
-          try {
-            const registry = getUserSocketRegistry();
-            registry.setUserSocket(userId, socket.id);
-          } catch (error) {
-            console.error('[JOIN] Shadow write failed:', error.message);
-          }
-        }
-
         // Only broadcast online status if visibility is enabled
         if (await shouldBroadcastOnline(userId)) {
           socket.broadcast.emit(SOCKET_EVENTS.USER_ONLINE, { userId: String(userId) });
@@ -82,7 +84,7 @@ export const setupChatSocket = (io, userSockets) => {
         const onlineUserIds = Array.from(userSockets.keys());
         socket.emit('online-users-list', { userIds: onlineUserIds });
 
-        console.log('[SOCKET] User joined:', userId);
+        console.log('[SOCKET] User joined:', userId, '(type:', socketType, ')');
       } catch (err) {
         console.error('[CHAT_SOCKET] JOIN error:', err);
       }
@@ -330,7 +332,16 @@ export const setupChatSocket = (io, userSockets) => {
       try {
         if (socket.userId) {
           const userId = socket.userId;
+          const socketType = socket.socketType || 'UI';
           
+          // Remove this specific socket type from the registry
+          try {
+            await registry.remove(userId, socketType);
+            console.log(`[SOCKET] Removed ${socketType} socket for user ${userId}`);
+          } catch (regErr) {
+            console.error('[DISCONNECT] Registry remove failed:', regErr.message);
+          }
+
           // Phase 63: Check if user has other active connections before marking offline
           const remainingSockets = await io.in(userId).fetchSockets();
           
@@ -339,16 +350,6 @@ export const setupChatSocket = (io, userSockets) => {
 
             // Clean up any active call for this user
             cleanupUserActiveCall(userId, io, userSockets);
-
-            // Shadow delete from Redis registry (dev-only)
-            if (process.env.REDIS_SOCKET_REGISTRY_SHADOW === 'true' && process.env.NODE_ENV !== 'production') {
-              try {
-                const registry = getUserSocketRegistry();
-                registry.deleteUserSocket(userId);
-              } catch (error) {
-                console.error('[DISCONNECT] Shadow delete failed:', error.message);
-              }
-            }
 
             // Only broadcast offline if user was visible to others
             if (socket.onlineVisibility !== false) {

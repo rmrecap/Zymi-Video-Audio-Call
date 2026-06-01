@@ -11,12 +11,13 @@ import PremiumMessageComposer from './chat/PremiumMessageComposer.jsx';
 import PremiumChatSidebar from './chat/PremiumChatSidebar.jsx';
 import MobileChatHome from './chat/MobileChatHome.jsx';
 import ContactProfilePanel from './chat/ContactProfilePanel.jsx';
-import PremiumChatShell from './chat/PremiumChatShell.jsx';
-import PremiumMediaRenderer from './chat/PremiumMediaRenderer.jsx';
 import MobileConversationScreen from './chat/MobileConversationScreen.jsx';
 import NearbyDiscovery from './chat/NearbyDiscovery.jsx';
 import { soundService } from '../services/soundService.js';
 import MobileChatLayout from './chat/MobileChatLayout.jsx';
+import UserProfileModal from './chat/UserProfileModal.jsx';
+import PremiumChatShell from './chat/PremiumChatShell.jsx';
+import PremiumMediaRenderer from './chat/PremiumMediaRenderer.jsx';
 import { API_URL } from '../config/api.js';
 import { getWebRTCConfig } from '../config/webrtcConfig.js';
 import './Dashboard.css';
@@ -61,6 +62,7 @@ function Dashboard({ user, onLogout }) {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [lastMessagePreview, setLastMessagePreview] = useState({});
   const [activeView, setActiveView] = useState('chats');
+  const [showMyProfile, setShowMyProfile] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -960,6 +962,7 @@ const handleSelectUser = (u) => {
             currentUser={user}
             activeView={activeView}
             onLogout={onLogout}
+            onShowMyProfile={() => setShowMyProfile(true)}
             onViewChange={(view) => {
               setActiveView(view);
               if (view !== 'chats') setSelectedUser(null);
@@ -1060,6 +1063,20 @@ const handleSelectUser = (u) => {
         onToggleMute={toggleMic}
         onToggleCamera={toggleCamera}
       />
+
+      {showMyProfile && (
+        <UserProfileModal 
+          user={user} 
+          onClose={() => setShowMyProfile(false)} 
+          onUpdate={(newData) => {
+            // Update local user state if needed
+            const updated = { ...user, ...newData };
+            localStorage.setItem('zymi_user', JSON.stringify(updated));
+            // Force refresh or update state
+            window.location.reload(); 
+          }}
+        />
+      )}
     </div>
   );
 }

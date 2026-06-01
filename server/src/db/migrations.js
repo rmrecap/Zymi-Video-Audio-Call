@@ -91,7 +91,15 @@ export const runMigrations = async () => {
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS country_code TEXT');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS country_name TEXT');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS city_name TEXT');
-    console.log('[MIGRATION] users table columns verified');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS work TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS hobby TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS family_members JSONB');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_status TEXT DEFAULT \'free\'');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_server TEXT');
+    console.log('[MIGRATION] users table columns verified with profile fields');
   } catch (e) {
     console.warn('[MIGRATION] Could not verify/add columns to users:', e.message);
   }
@@ -151,6 +159,17 @@ if (!(await indexExists('idx_messages_conversation'))) {
     )
   `);
   console.log('[MIGRATION] admin_audit_logs table ready');
+ 
+  // ─── AUDIT LOGS (General/Policy ACK tracking) ─────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id SERIAL PRIMARY KEY,
+      log_type TEXT NOT NULL,
+      data TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  console.log('[MIGRATION] audit_logs table ready');
 
   // ─── FEATURE FLAGS ────────────────────────────────────────────────────────
   await exec(`
@@ -288,6 +307,11 @@ if (!(await indexExists('idx_messages_conversation'))) {
     'INSERT INTO nearby_global_settings (id, default_radius_km, report_threshold, approximate_only) VALUES (1, 5, 3, TRUE) ON CONFLICT (id) DO NOTHING'
   );
   console.log('[MIGRATION] nearby_global_settings table ready');
+  try {
+    await exec("ALTER TABLE nearby_global_settings ADD COLUMN IF NOT EXISTS privacy_mode TEXT DEFAULT 'NORMAL'");
+  } catch (e) {
+    console.warn('[MIGRATION] Could not verify/add privacy_mode column to nearby_global_settings:', e.message);
+  }
 
   // ─── AD GLOBAL SETTINGS ───────────────────────────────────────────────────
   await exec(`

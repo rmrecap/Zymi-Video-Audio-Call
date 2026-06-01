@@ -1,5 +1,6 @@
 // server/src/socket/callState.js
 import { SOCKET_EVENTS } from '../../shared/socketEvents.js';
+import { registry } from './userSocketRegistry.js';
 
 // Active calls registry: userId -> { peerId, callId, startedAt }
 const activeCalls = new Map();
@@ -18,12 +19,22 @@ export const clearActiveCall = (a, b) => {
   activeCalls.delete(bStr);
 };
 
-export const cleanupUserActiveCall = (userId, io, userSockets) => {
+export const cleanupUserActiveCall = async (userId, io, userSockets) => {
   const userIdStr = String(userId);
   const active = activeCalls.get(userIdStr);
   if (!active) return;
 
-  const peerSocketId = userSockets.get(String(active.peerId));
+  // Try registry first (UI socket preferred for active call peer), fall back to local Map
+  let peerSocketId = null;
+  try {
+    peerSocketId = await registry.getSocket(String(active.peerId), 'UI');
+  } catch (err) {
+    // Registry unavailable
+  }
+  if (!peerSocketId) {
+    peerSocketId = userSockets.get(String(active.peerId));
+  }
+
   if (peerSocketId) {
     io.to(peerSocketId).emit(SOCKET_EVENTS.CALL_ENDED, { from: userIdStr, reason: 'peer-disconnected' });
   }

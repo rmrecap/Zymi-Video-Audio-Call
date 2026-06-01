@@ -78,7 +78,11 @@ export const attachAuthMiddleware = (io) => {
     socket.user = result.user;
     socket.tokenVersion = result.user?.tokenVersion;
 
-    console.log(`[SOCKET_AUTH] User ${result.userId} authenticated`);
+    // Socket Type Protocol: UI (volatile view) or BACKGROUND (persistent daemon)
+    const socketType = socket.handshake.auth?.type || 'UI';
+    socket.socketType = socketType;
+
+    console.log(`[SOCKET_AUTH] User ${result.userId} authenticated (type: ${socketType})`);
     next();
   });
 };

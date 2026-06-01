@@ -1,165 +1,168 @@
-// User Socket Registry - Redis/Local Hybrid
-// Phase 4C: Helper Module Only - Not Wired to Runtime
-// Provides distributed userId → socketId mapping for multi-node scaling
+import { getRedisClient } from './redisAdapter.js';
+import Redlock from 'redlock';
 
 class UserSocketRegistry {
-  constructor(redisClient = null) {
-    this.localMap = new Map(); // Primary: userId → socketId
-    this.redisClient = redisClient; // Optional: for multi-node
-    this.shadowMode = false; // Write to Redis but read from local only
-    this.healthMetrics = {
-      localOperations: 0,
-      redisOperations: 0,
-      redisFailures: 0,
-      staleSocketIds: 0
-    };
+  constructor() {
+    this.keyPrefix = 'user_sockets:';
+    this.localMap = new Map(); // Fallback when Redis is not available
+    this._redlock = null;
   }
 
-  // Core API - Local Map Primary
-  setUserSocket(userId, socketId) {
-    // Normalize userId to string for consistency
-    const normalizedUserId = String(userId);
-
-    // Update local Map (always primary)
-    this.localMap.set(normalizedUserId, socketId);
-    this.healthMetrics.localOperations++;
-
-    // Shadow write to Redis if enabled
-    if (this.shadowMode && this.redisClient) {
-      this._shadowWriteToRedis(normalizedUserId, socketId);
-    }
-
-    return true;
-  }
-
-  getUserSocket(userId) {
-    const normalizedUserId = String(userId);
-
-    // Always read from local Map (primary)
-    const socketId = this.localMap.get(normalizedUserId);
-    this.healthMetrics.localOperations++;
-
-    // In shadow mode, optionally compare with Redis for diagnostics
-    if (this.shadowMode && this.redisClient) {
-      this._compareWithRedis(normalizedUserId, socketId);
-    }
-
-    return socketId;
-  }
-
-  deleteUserSocket(userId) {
-    const normalizedUserId = String(userId);
-
-    // Delete from local Map
-    const deleted = this.localMap.delete(normalizedUserId);
-    this.healthMetrics.localOperations++;
-
-    // Shadow delete from Redis
-    if (this.shadowMode && this.redisClient) {
-      this._shadowDeleteFromRedis(normalizedUserId);
-    }
-
-    return deleted;
-  }
-
-  hasUserSocket(userId) {
-    const normalizedUserId = String(userId);
-    this.healthMetrics.localOperations++;
-    return this.localMap.has(normalizedUserId);
-  }
-
-  getRegistryHealth() {
-    return {
-      localMapSize: this.localMap.size,
-      shadowMode: this.shadowMode,
-      redisAvailable: !!this.redisClient,
-      metrics: { ...this.healthMetrics },
-      timestamp: Date.now()
-    };
-  }
-
-  // Shadow Mode Controls
-  enableShadowMode() {
-    if (!this.redisClient) {
-      console.warn('[UserSocketRegistry] Cannot enable shadow mode: Redis not available');
-      return false;
-    }
-    this.shadowMode = true;
-    console.log('[UserSocketRegistry] Shadow mode enabled');
-    return true;
-  }
-
-  disableShadowMode() {
-    this.shadowMode = false;
-    console.log('[UserSocketRegistry] Shadow mode disabled');
-    return true;
-  }
-
-  // Private Methods - Redis Operations (Shadow Mode Only)
-  async _shadowWriteToRedis(userId, socketId) {
-    try {
-      const key = `user_socket:${userId}`;
-      const value = JSON.stringify({
-        socketId,
-        timestamp: Date.now(),
-        nodeId: process.env.NODE_ID || 'unknown'
+  get redlock() {
+    if (!this._redlock && this.redis) {
+      this._redlock = new Redlock([this.redis], {
+        driftFactor: 0.01,
+        retryCount: 3,
+        retryDelay: 200,
+        retryJitter: 50
       });
-
-      await this.redisClient.setex(key, 3600, value); // 1 hour TTL
-      this.healthMetrics.redisOperations++;
-    } catch (error) {
-      console.error('[UserSocketRegistry] Redis shadow write failed:', error.message);
-      this.healthMetrics.redisFailures++;
     }
+    return this._redlock;
   }
 
-  async _shadowDeleteFromRedis(userId) {
-    try {
-      const key = `user_socket:${userId}`;
-      await this.redisClient.del(key);
-      this.healthMetrics.redisOperations++;
-    } catch (error) {
-      console.error('[UserSocketRegistry] Redis shadow delete failed:', error.message);
-      this.healthMetrics.redisFailures++;
-    }
+  get redis() {
+    return getRedisClient();
   }
 
-  async _compareWithRedis(userId, localSocketId) {
-    // Diagnostics only - compare local vs Redis for monitoring
-    try {
-      const key = `user_socket:${userId}`;
-      const redisData = await this.redisClient.get(key);
+  async register(userId, socketId, type = 'UI') {
+    const normalizedUserId = String(userId);
+    const client = this.redis;
+    const value = JSON.stringify({ sid: socketId, ts: Date.now() });
 
-      if (redisData) {
-        const parsed = JSON.parse(redisData);
-        if (parsed.socketId !== localSocketId) {
-          console.warn(`[UserSocketRegistry] Socket ID mismatch for user ${userId}: local=${localSocketId}, redis=${parsed.socketId}`);
-        }
-      } else {
-        console.warn(`[UserSocketRegistry] User ${userId} not found in Redis but exists locally`);
+    if (client) {
+      const lockKey = `locks:registry:${normalizedUserId}`;
+      let lock = null;
+      const t0 = Date.now();
+      try {
+        if (this.redlock) lock = await this.redlock.acquire([lockKey], 1000);
+        const waitTime = Date.now() - t0;
+        if (waitTime > 10) console.log(`[REGISTRY] Telemetry: lock_wait_time=${waitTime}ms for user ${normalizedUserId}`);
+        const key = `${this.keyPrefix}${normalizedUserId}`;
+        await client.hSet(key, type, value);
+        await client.expire(key, 86400); // 24h persistence
+      } finally {
+        if (lock) await lock.release().catch(() => {});
       }
-    } catch (error) {
-      // Redis comparison failures are non-critical
-      this.healthMetrics.redisFailures++;
+    } else {
+      if (!this.localMap.has(normalizedUserId)) {
+        this.localMap.set(normalizedUserId, {});
+      }
+      this.localMap.get(normalizedUserId)[type] = value;
     }
   }
 
-  // Cleanup for stale entries
-  cleanupStaleSockets() {
-    // Implementation for removing disconnected sockets
-    // Called periodically or on Redis key expiration
+  async getSocket(userId, preferredType = 'UI') {
+    const normalizedUserId = String(userId);
+    const client = this.redis;
+    let sockets = {};
+
+    if (client) {
+      const key = `${this.keyPrefix}${normalizedUserId}`;
+      sockets = await client.hGetAll(key);
+    } else {
+      sockets = this.localMap.get(normalizedUserId) || {};
+    }
+
+    const dataStr = sockets[preferredType] || sockets['BACKGROUND'];
+    if (!dataStr) return null;
+    try {
+      const { sid } = JSON.parse(dataStr);
+      return sid;
+    } catch {
+      return dataStr; // Fallback for legacy format
+    }
+  }
+
+  async remove(userId, type) {
+    const normalizedUserId = String(userId);
+    const client = this.redis;
+    if (client) {
+      const key = `${this.keyPrefix}${normalizedUserId}`;
+      await client.hDel(key, type);
+      // Auto-clean key if no sockets remain
+      const remaining = await client.hLen(key);
+      if (remaining === 0) await client.del(key);
+    } else {
+      const sockets = this.localMap.get(normalizedUserId);
+      if (sockets) {
+        delete sockets[type];
+        if (Object.keys(sockets).length === 0) {
+          this.localMap.delete(normalizedUserId);
+        }
+      }
+    }
+  }
+
+  /**
+   * Atomic logout purge — deletes ALL socket entries for a user (UI + BACKGROUND).
+   * Must be called during the logout flow to prevent ghost registry entries.
+   */
+  async purgeUser(userId) {
+    const normalizedUserId = String(userId);
+    const client = this.redis;
+    if (client) {
+      await client.del(`${this.keyPrefix}${normalizedUserId}`);
+    } else {
+      this.localMap.delete(normalizedUserId);
+    }
+    console.log(`[REGISTRY] Purged all sockets for user ${normalizedUserId}`);
+  }
+
+  async registerBatch(entries) {
+    const client = this.redis;
+    if (client) {
+      // Group by userId to acquire locks correctly, or bypass locks for batching for speed
+      // But to be fail-safe, we just use the pipeline without locks if it's a true burst,
+      // or we can lock each user. For mass burst, pipeline is best.
+      const pipeline = client.multi();
+      for (const { userId, socketId, type } of entries) {
+        pipeline.hSet(`${this.keyPrefix}${userId}`, type, JSON.stringify({ sid: socketId, ts: Date.now() }));
+      }
+      await pipeline.exec();
+    } else {
+      for (const { userId, socketId, type } of entries) {
+        await this.register(userId, socketId, type);
+      }
+    }
+  }
+
+  async reapZombieSockets(io) {
+    const client = this.redis;
+    if (client) {
+      // Trunk Resilience: Cross-reference Redis with actual Socket.io instance
+      const allUsers = await client.keys(`${this.keyPrefix}*`);
+      const now = Date.now();
+      for (const userKey of allUsers) {
+        const sockets = await client.hGetAll(userKey);
+        for (const [type, dataStr] of Object.entries(sockets)) {
+          let sid = dataStr;
+          let ts = 0;
+          try {
+            const parsed = JSON.parse(dataStr);
+            sid = parsed.sid;
+            ts = parsed.ts || 0;
+          } catch (e) {
+            // legacy format
+          }
+
+          // Trunk Collision: 5-second grace period for fresh connections
+          if (now - ts > 5000 && !io.sockets.sockets.has(sid)) {
+            await client.hDel(userKey, type); // Clean stale entry
+            cleanupCount++;
+          }
+        }
+      }
+      if (cleanupCount > 0) {
+        console.log(`[REAPER] Telemetry: reaper_cleanup_count=${cleanupCount}`);
+      }
+    }
   }
 }
 
-// Export singleton instance
-let registryInstance = null;
+export const registry = new UserSocketRegistry();
 
+// Keep backward compatibility for other modules if needed
 export function getUserSocketRegistry() {
-  if (!registryInstance) {
-    // Redis client would be passed from server initialization
-    registryInstance = new UserSocketRegistry(null); // Redis client placeholder
-  }
-  return registryInstance;
+  return registry;
 }
-
 export { UserSocketRegistry };

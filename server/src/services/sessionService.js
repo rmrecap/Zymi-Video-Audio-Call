@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { get, run } from '../db/postgres.js';
 import { config } from '../config/env.js';
@@ -10,7 +11,9 @@ export const createToken = (user) => {
       userId: user.id,
       username: user.username,
       role: user.role,
-      tokenVersion: user.token_version || 1
+      tokenVersion: user.token_version || 1,
+      jti: crypto.randomUUID(),
+      sub: user.id
     },
     JWT_SECRET,
     { expiresIn: '7d' }

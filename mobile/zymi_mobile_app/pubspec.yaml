@@ -16,6 +16,10 @@ dependencies:
   geolocator: ^10.1.0
   flutter_map: ^6.1.0
   latlong2: ^0.9.0
+  flutter_background_service: ^5.1.0
+  flutter_background_service_android: ^6.3.1
+  flutter_ringtone_player: ^4.0.0+4
+  connectivity_plus: ^7.1.1
 
 dev_dependencies:
   flutter_test:

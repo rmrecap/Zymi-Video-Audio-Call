@@ -1,4 +1,5 @@
 import pg from 'pg';
+import os from 'os';
 import { config, isProduction } from '../config/env.js';
 import { db as sqlite } from './sqlite_provider.js';
 
@@ -15,9 +16,18 @@ export const initPostgres = () => {
     return null;
   }
 
+  // Calculate pool size based on available CPU cores and PM2 cluster size
+  const cpuCount = os.cpus().length;
+  const globalMaxConnections = 250; // Set in postgresql.conf
+  const instances = parseInt(process.env.NODE_APP_INSTANCE_COUNT || cpuCount.toString(), 10);
+  const safePoolSize = Math.floor(globalMaxConnections / instances) - 5;
+  const maxPoolSize = safePoolSize > 10 ? safePoolSize : 20;
+
+  console.log(`[POSTGRES] Calculating pool size. CPUs: ${cpuCount}, Instances: ${instances}, Safe Pool Size: ${safePoolSize}, Using max pool size: ${maxPoolSize}`);
+
   pool = new Pool({
     connectionString: config.databaseUrl,
-    max: 20,
+    max: maxPoolSize,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   });

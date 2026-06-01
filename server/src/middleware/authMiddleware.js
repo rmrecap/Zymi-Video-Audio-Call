@@ -43,6 +43,8 @@ export const requireAuth = async (req, res, next) => {
       username: user.username,
       role: user.role,
       tokenVersion: user.token_version,
+      jti: decoded.jti,
+      sub: decoded.userId,
       settings: {
         notificationSound: !!user.notification_sound,
         callRingtone: !!user.call_ringtone,

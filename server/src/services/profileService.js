@@ -6,7 +6,9 @@ export const getProfile = async (userId) => {
     SELECT 
       id, username, display_name, status_text, avatar, 
       phone, phone_verified, email, email_verified, 
-      profile_completion, verification_status, created_at 
+      profile_completion, verification_status, created_at,
+      first_name, last_name, address, work, hobby, family_members,
+      premium_status, selected_server
     FROM users WHERE id = $1
   `, [userId]);
 
@@ -18,7 +20,15 @@ export const getProfile = async (userId) => {
     statusText: user.status_text || '',
     phoneVerified: !!user.phone_verified,
     emailVerified: !!user.email_verified,
-    profileCompletion: user.profile_completion || 40
+    profileCompletion: user.profile_completion || 40,
+    firstName: user.first_name || '',
+    lastName: user.last_name || '',
+    address: user.address || '',
+    work: user.work || '',
+    hobby: user.hobby || '',
+    familyMembers: user.family_members || [],
+    premiumStatus: user.premium_status || 'free',
+    selectedServer: user.selected_server || 'Default'
   };
 };
 
@@ -27,13 +37,24 @@ export const updateProfile = async (userId, data) => {
   const params = [];
   let idx = 1;
 
-  if (data.displayName !== undefined) {
-    updates.push(`display_name = $${idx++}`);
-    params.push(data.displayName);
-  }
-  if (data.statusText !== undefined) {
-    updates.push(`status_text = $${idx++}`);
-    params.push(data.statusText);
+  const fieldMap = {
+    displayName: 'display_name',
+    statusText: 'status_text',
+    firstName: 'first_name',
+    lastName: 'last_name',
+    address: 'address',
+    work: 'work',
+    hobby: 'hobby',
+    familyMembers: 'family_members',
+    premiumStatus: 'premium_status',
+    selectedServer: 'selected_server'
+  };
+
+  for (const [key, col] of Object.entries(fieldMap)) {
+    if (data[key] !== undefined) {
+      updates.push(`${col} = $${idx++}`);
+      params.push(key === 'familyMembers' ? JSON.stringify(data[key]) : data[key]);
+    }
   }
 
   if (updates.length === 0) return { success: false, error: 'No updates provided' };

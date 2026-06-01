@@ -48,8 +48,10 @@ import clientErrorRoutes from './src/routes/clientErrorRoutes.js';
 import { attachAuthMiddleware } from './src/socket/socketAuthGuard.js';
 import { initRedis } from './src/socket/redisAdapter.js';
 import { authRateLimit } from './src/middleware/rateLimit.js';
+import { globalLimiter } from './src/middleware/rateLimiter.js';
 import { setupCallSocket } from './src/socket/callSocket.js';
 import { setupChatSocket } from './src/socket/chatSocket.js';
+import { setupAdminSocket } from './src/socket/adminSocket.js';
 import { register, login, adminLogin } from './src/routes/authRoutes.js';
 import { getUsers, getMessages, searchMessages, getUnread, markAsRead } from './src/routes/messageRoutes.js';
 import { editMessage, getMessageEdits } from './src/routes/messageEditRoutes.js';
@@ -110,6 +112,7 @@ app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(globalLimiter);
 
 app.use(fileUpload({
   limits: { fileSize: 2 * 1024 * 1024 },
@@ -217,12 +220,56 @@ if (redisResult.adapter) {
   io.adapter(redisResult.adapter);
 }
 
+// Sync database settings to Redis cache
+import { db } from './src/db/db_provider.js';
+async function syncFeaturesToRedis() {
+  const redisClient = getRedisClient();
+  if (redisClient) {
+    try {
+      const flags = await db.all("SELECT feature_key, enabled FROM feature_flags");
+      for (const flag of flags) {
+        await redisClient.hSet('zymi:features', flag.feature_key, flag.enabled ? 'true' : 'false');
+      }
+      const settings = await db.get("SELECT default_radius_km, approximate_only, privacy_mode FROM nearby_global_settings WHERE id = 1");
+      if (settings) {
+        const radiusMeters = (settings.default_radius_km || 5) * 1000;
+        const fuzzing = settings.approximate_only ? '0.005' : '0.0';
+        await redisClient.hSet('zymi:config:nearby', {
+          radius: String(radiusMeters),
+          fuzzing: fuzzing,
+          privacy_mode: settings.privacy_mode || 'NORMAL'
+        });
+      }
+      console.log('[REDIS] Feature flags and nearby settings synced to Redis');
+    } catch (err) {
+      console.error('[REDIS] Error syncing features to Redis:', err.message);
+    }
+  }
+}
+await syncFeaturesToRedis();
+
+import { registry } from './src/socket/userSocketRegistry.js';
+
 if (isProduction()) {
   attachAuthMiddleware(io);
 }
 
+// Global connection listener to register BACKGROUND (and UI) sockets automatically
+io.on('connection', async (socket) => {
+  if (socket.userId) {
+    const socketType = socket.socketType || 'UI';
+    try {
+      await registry.register(socket.userId, socket.id, socketType);
+      console.log(`[INDEX_SOCKET] Registered ${socketType} socket for user ${socket.userId}`);
+    } catch (err) {
+      console.error('[INDEX_SOCKET] Registry write failed:', err.message);
+    }
+  }
+});
+
 setupCallSocket(io, userSockets, callActivity);
 setupChatSocket(io, userSockets);
+setupAdminSocket(io);
 
 const PORT = config.port || 5000;
 const startServer = (port) => {

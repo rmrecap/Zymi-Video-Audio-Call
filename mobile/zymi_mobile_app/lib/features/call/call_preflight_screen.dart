@@ -3,6 +3,7 @@ import 'call_preflight_state.dart';
 import 'services/call_permission_service.dart';
 import '../../core/runtime/app_runtime_state.dart';
 import '../../core/runtime/runtime_state_binder.dart';
+import '../../services/governance/policy_gate_service.dart';
 
 class CallPreflightScreen extends StatefulWidget {
   final String peerId;
@@ -77,55 +78,101 @@ class _CallPreflightScreenState extends State<CallPreflightScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0f172a),
-      appBar: AppBar(
-        title: const Text('Call Preflight'),
-        backgroundColor: const Color(0xFF1e293b),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _permRow('Microphone', _state.hasMicPermission),
-            const SizedBox(height: 8),
-            ElevatedButton(onPressed: _checkMic, child: const Text('Check Microphone')),
-
-            const SizedBox(height: 16),
-            _permRow('Camera', _state.hasCameraPermission),
-            const SizedBox(height: 8),
-            ElevatedButton(onPressed: _checkCamera, child: const Text('Check Camera')),
-
-            const SizedBox(height: 24),
-            Text(
-              'Status: ${_state.status.name}',
-              style: const TextStyle(color: Colors.white70, fontSize: 14),
+    return AnimatedBuilder(
+      animation: PolicyGateService.instance,
+      builder: (context, _) {
+        final featureKey = widget.isVideo ? 'video_call_enabled' : 'audio_call_enabled';
+        final isEnabled = PolicyGateService.instance.isEnabled(featureKey);
+        
+        if (!isEnabled) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF0f172a),
+            appBar: AppBar(
+              title: const Text('Call Preflight'),
+              backgroundColor: const Color(0xFF1e293b),
             ),
-            Text(
-              'Ad Gate: ${appRuntimeState.canShowAds ? "SAFE" : "BLOCKED (expected)"}',
-              style: TextStyle(
-                color: appRuntimeState.canShowAds ? Colors.green : Colors.amber,
-                fontSize: 13,
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+                    const SizedBox(height: 16),
+                    Text(
+                      '${widget.isVideo ? "Video" : "Audio"} Calling Disabled',
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Calling features are temporarily disabled by the administrator.',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    OutlinedButton(
+                      onPressed: _cancel,
+                      child: const Text('Go Back'),
+                    ),
+                  ],
+                ),
               ),
             ),
-            if (_state.errorMessage != null)
-              Text(_state.errorMessage!, style: const TextStyle(color: Colors.redAccent)),
+          );
+        }
 
-            const Spacer(),
-            ElevatedButton(
-              onPressed: _state.hasMicPermission ? _markReady : null,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Ready to Call (Preflight Only)'),
+        return Scaffold(
+          backgroundColor: const Color(0xFF0f172a),
+          appBar: AppBar(
+            title: const Text('Call Preflight'),
+            backgroundColor: const Color(0xFF1e293b),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _permRow('Microphone', _state.hasMicPermission),
+                const SizedBox(height: 8),
+                ElevatedButton(onPressed: _checkMic, child: const Text('Check Microphone')),
+
+                const SizedBox(height: 16),
+                _permRow('Camera', _state.hasCameraPermission),
+                const SizedBox(height: 8),
+                ElevatedButton(onPressed: _checkCamera, child: const Text('Check Camera')),
+
+                const SizedBox(height: 24),
+                Text(
+                  'Status: ${_state.status.name}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                Text(
+                  'Ad Gate: ${appRuntimeState.canShowAds ? "SAFE" : "BLOCKED (expected)"}',
+                  style: TextStyle(
+                    color: appRuntimeState.canShowAds ? Colors.green : Colors.amber,
+                    fontSize: 13,
+                  ),
+                ),
+                if (_state.errorMessage != null)
+                  Text(_state.errorMessage!, style: const TextStyle(color: Colors.redAccent)),
+
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: _state.hasMicPermission ? _markReady : null,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  child: const Text('Ready to Call (Preflight Only)'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: _cancel,
+                  child: const Text('Cancel'),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: _cancel,
-              child: const Text('Cancel'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

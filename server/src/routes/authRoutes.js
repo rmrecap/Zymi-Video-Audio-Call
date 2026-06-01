@@ -4,6 +4,7 @@ import { createToken } from '../services/sessionService.js';
 import { logAudit } from '../services/auditService.js';
 import { requestEmailOTP, verifyEmailOTP } from '../services/otpService.js';
 import { updateProfileCompletion } from '../services/profileCompletionService.js';
+import { registry } from '../socket/userSocketRegistry.js';
 
 export const register = async (req, res) => {
   const { username, email, password } = req.body;
@@ -85,8 +86,16 @@ export const login = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
-  // Client handles token removal, but we can log it
-  await logAudit(req.user?.id, 'user_logout', req.user?.id, 'User logged out');
+  const userId = req.user?.id;
+  // Atomic registry purge: removes UI + BACKGROUND socket entries from Redis
+  if (userId) {
+    try {
+      await registry.purgeUser(userId);
+    } catch (err) {
+      console.error('[LOGOUT] Registry purge failed:', err.message);
+    }
+  }
+  await logAudit(userId, 'user_logout', userId, 'User logged out');
   res.json({ success: true });
 };
 

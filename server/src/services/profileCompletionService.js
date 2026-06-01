@@ -4,9 +4,14 @@ export const calculateProfileCompletion = (user) => {
   let score = 40; // Base registration score
 
   if (user.avatar) score += 10;
-  if (user.email_verified) score += 20;
-  if (user.phone_verified) score += 20;
-  if (user.country && user.city) score += 10;
+  if (user.email_verified) score += 15;
+  if (user.phone_verified) score += 15;
+  if (user.country && user.city) score += 5;
+  if (user.first_name && user.last_name) score += 5;
+  if (user.address) score += 3;
+  if (user.work) score += 3;
+  if (user.hobby) score += 2;
+  if (user.family_members && user.family_members.length > 0) score += 2;
 
   return Math.min(score, 100);
 };
