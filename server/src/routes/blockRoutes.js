@@ -1,6 +1,6 @@
 import { checkBlocked, blockUser, unblockUser, getBlockedUsers } from '../services/blockService.js';
 
-export const block = (req, res) => {
+export const block = async (req, res) => {
   const blockerId = req.user.id;
   const targetUserId = req.body.targetUserId || req.params.userId;
 
@@ -14,11 +14,11 @@ export const block = (req, res) => {
     return res.status(400).json({ error: 'Cannot block yourself' });
   }
 
-  blockUser(blockerId, tid);
+  await blockUser(blockerId, tid);
   res.json({ success: true, message: 'User blocked' });
 };
 
-export const unblock = (req, res) => {
+export const unblock = async (req, res) => {
   const blockerId = req.user.id;
   const targetUserId = req.body.targetUserId || req.params.userId;
 
@@ -26,24 +26,24 @@ export const unblock = (req, res) => {
     return res.status(400).json({ error: 'Target user ID required' });
   }
 
-  unblockUser(blockerId, parseInt(targetUserId));
+  await unblockUser(blockerId, parseInt(targetUserId));
   res.json({ success: true, message: 'User unblocked' });
 };
 
-export const checkBlock = (req, res) => {
+export const checkBlock = async (req, res) => {
   const blockerId = req.user.id;
   const targetUserId = parseInt(req.params.targetId);
 
-  const blocked = checkBlocked(blockerId, targetUserId);
+  const blocked = await checkBlocked(blockerId, targetUserId);
   res.json({ blocked });
 };
 
-export const listBlocked = (req, res) => {
+export const listBlocked = async (req, res) => {
   const userId = req.user.id;
-  const blocked = getBlockedUsers(userId);
+  const blocked = await getBlockedUsers(userId);
   res.json(blocked);
 };
 
-export const isBlocked = (blockerId, targetId) => {
-  return checkBlocked(blockerId, targetId);
+export const isBlocked = async (blockerId, targetId) => {
+  return await checkBlocked(blockerId, targetId);
 };

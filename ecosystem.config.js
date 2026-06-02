@@ -33,7 +33,6 @@ module.exports = {
       graceful_shutdown: true,
       source_map_support_override: true,
       exp_backoff_restart_delay: 100,
-      autorestart: true,
       tree: false
     }
   ],

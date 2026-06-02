@@ -14,29 +14,26 @@ export const uploadAvatar = async (req, res) => {
   }
 
   const userId = req.user.id;
+  const file = req.files?.file || req.files?.avatar;
 
-  if (!req.file) {
+  if (!file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const validation = validateAvatar(req.file.buffer, req.file.mimetype, req.file.originalname);
+  const validation = validateAvatar(file.data, file.mimetype, file.name);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.error });
   }
 
-  // Fetch current user to get old avatar
   const user = await get('SELECT avatar FROM users WHERE id = $1', [userId]);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // Save new avatar
-  const avatarUrl = saveAvatar(userId, req.file.buffer, req.file.originalname);
+  const avatarUrl = saveAvatar(userId, file.data, file.name);
 
-  // Update user record
   await run('UPDATE users SET avatar = $1 WHERE id = $2', [avatarUrl, userId]);
 
-  // Delete old avatar if exists
   if (user.avatar) {
     deleteAvatar(user.avatar);
   }
@@ -101,17 +98,19 @@ export const uploadMessageFile = async (req, res) => {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  if (!req.file) {
+  const file = req.files?.file;
+
+  if (!file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const validation = validateMessageFile(req.file.buffer, req.file.mimetype, req.file.originalname);
+  const validation = validateMessageFile(file.data, file.mimetype, file.name);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.error });
   }
 
-  const fileUrl = saveMessageFile(req.file.buffer, req.file.originalname, req.user.id);
-  const ext = path.extname(req.file.originalname).toLowerCase();
+  const fileUrl = saveMessageFile(file.data, file.name, req.user.id);
+  const ext = path.extname(file.name).toLowerCase();
   
   let mediaType = 'document';
   if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) mediaType = 'image';
@@ -119,9 +118,9 @@ export const uploadMessageFile = async (req, res) => {
 
   res.json({
     url: fileUrl,
-    fileName: req.file.originalname,
-    fileSize: req.file.size,
-    mimeType: req.file.mimetype,
+    fileName: file.name,
+    fileSize: file.size,
+    mimeType: file.mimetype,
     mediaType
   });
 };

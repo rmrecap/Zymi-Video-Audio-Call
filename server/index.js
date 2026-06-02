@@ -46,7 +46,7 @@ await initAdminSeed();
 import healthRoutes from './src/routes/healthRoutes.js';
 import clientErrorRoutes from './src/routes/clientErrorRoutes.js';
 import { attachAuthMiddleware } from './src/socket/socketAuthGuard.js';
-import { initRedis } from './src/socket/redisAdapter.js';
+import { initRedis, getRedisClient } from './src/socket/redisAdapter.js';
 import { authRateLimit } from './src/middleware/rateLimit.js';
 import { globalLimiter } from './src/middleware/rateLimiter.js';
 import { setupCallSocket } from './src/socket/callSocket.js';

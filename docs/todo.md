@@ -16,8 +16,8 @@
 - [x] **0.4** Standardize file naming conventions across `client/`, `server/`, `mobile/`, and `docs/`.
 - [x] **0.5** Consolidate scattered doc fragments into master files (`architecture-master.md`, `zrcs-master.md`, `socket-master.md`, `webrtc-master.md`, `postgres-master.md`).
 - [x] **0.6** Establish `.gitignore` rules for `node_modules/`, `.env`, build artifacts, and IDE files.
-- [ ] **0.7** Audit and remove dead code paths, unused imports, and orphaned components in `client/src/` and `server/src/`.
-- [ ] **0.8** Verify all environment variable templates (`.env.example`, `.env.production.example`) are current and complete.
+- [x] **0.7** Audit and remove dead code paths, unused imports, and orphaned components in `client/src/` and `server/src/`.
+- [x] **0.8** Verify all environment variable templates (`.env.example`, `.env.production.example`) are current and complete.
 
 ---
 
@@ -52,11 +52,11 @@
 - [x] **2.6** Write initial migration SQL (`server/migrations/postgres/001_initial_schema.sql`).
 - [x] **2.7** Build SQLite → PostgreSQL data migration script (`server/scripts/migrate-sqlite-to-postgres.js`).
 - [x] **2.8** Add `phone_normalized` column and index on `users` for internal phone lookup.
-- [ ] **2.9** Run and verify full data migration with row-count validation across all tables.
-- [ ] **2.10** Add PostGIS / `earthdistance` extension and spatial index on `users` for Nearby queries.
-- [ ] **2.11** Implement automated migration versioning system (sequential numbered migrations).
-- [ ] **2.12** Set up automated `pg_dump` backup schedule via cron (daily at 02:00).
-- [ ] **2.13** Test and document the emergency restore procedure end-to-end.
+- [x] **2.9** Run and verify full data migration with row-count validation across all tables.
+- [x] **2.10** Add PostGIS / `earthdistance` extension and spatial index on `users` for Nearby queries.
+- [x] **2.11** Implement automated migration versioning system (sequential numbered migrations).
+- [x] **2.12** Set up automated `pg_dump` backup schedule via cron (daily at 02:00).
+- [x] **2.13** Test and document the emergency restore procedure end-to-end.
 
 ---
 
@@ -71,10 +71,10 @@
 - [x] **3.4** Implement `socketAuthGuard.js` — JWT validation on every Socket.io connection.
 - [x] **3.5** Implement phone number normalization and internal-only lookup API (`POST /api/users/lookup-phone`).
 - [x] **3.6** Add in-memory rate limiting on phone lookup to prevent enumeration.
-- [ ] **3.7** Implement JWT refresh token rotation for long-lived sessions.
-- [ ] **3.8** Add brute-force protection on login endpoint (account lockout after N failures).
-- [ ] **3.9** Implement password reset flow with OTP verification.
-- [ ] **3.10** Audit all endpoints to ensure no private metadata (email, IP, raw tokens) leaks to clients.
+- [x] **3.7** Implement JWT refresh token rotation for long-lived sessions.
+- [x] **3.8** Add brute-force protection on login endpoint (account lockout after N failures).
+- [x] **3.9** Implement password reset flow with OTP verification.
+- [x] **3.10** Audit all endpoints to ensure no private metadata (email, IP, raw tokens) leaks to clients.
 
 ---
 
@@ -95,17 +95,17 @@
 ### 4B: Message Delivery & Status
 - [x] **4B.1** Implement message persistence to PostgreSQL on send.
 - [x] **4B.2** Implement message status workflow: `pending → sent → delivered → seen | failed`.
-- [ ] **4B.3** Implement `message-delivered` acknowledgment when recipient receives message.
-- [ ] **4B.4** Implement `message-seen` read receipts with bulk-mark-as-read.
-- [ ] **4B.5** Implement offline message queuing for reliable delivery when recipient reconnects.
-- [ ] **4B.6** Implement message retry mechanism with exponential backoff for failed sends.
+- [x] **4B.3** Implement `message-delivered` acknowledgment when recipient receives message.
+- [x] **4B.4** Implement `message-seen` read receipts with bulk-mark-as-read.
+- [x] **4B.5** Implement offline message queuing for reliable delivery when recipient reconnects.
+- [x] **4B.6** Implement message retry mechanism with exponential backoff for failed sends.
 
 ### 4C: Media & Advanced Chat
-- [ ] **4C.1** Implement file/media attachment uploads with progress indicators.
+- [x] **4C.1** Implement file/media attachment uploads with progress indicators.
 - [ ] **4C.2** Implement client-side image compression before upload.
 - [ ] **4C.3** Implement end-to-end encryption (E2EE) for private 1-on-1 messaging.
 - [ ] **4C.4** Design and build group chat architecture (create group, add/remove members, group messaging).
-- [ ] **4C.5** Implement unread message badges and real-time message previews in the sidebar.
+- [x] **4C.5** Implement unread message badges and real-time message previews in the sidebar.
 
 ---
 
@@ -120,14 +120,14 @@
 - [x] **5A.3** Implement ICE candidate relay via Socket.io (`ice-candidate` event).
 - [x] **5A.4** Implement call state machine (`callState.js`) with proper lifecycle management.
 - [x] **5A.5** Implement `end-call` / `call-ended` synchronization with automatic cleanup on tab closure.
-- [ ] **5A.6** Finalize Coturn (STUN/TURN) production deployment for high NAT traversal success.
-- [ ] **5A.7** Implement bandwidth adaptation and connection fallback for poor network conditions.
-- [ ] **5A.8** Add call duration tracking and call history persistence to PostgreSQL.
+- [x] **5A.6** Finalize Coturn (STUN/TURN) production deployment for high NAT traversal success.
+- [x] **5A.7** Implement bandwidth adaptation and connection fallback for poor network conditions.
+- [x] **5A.8** Add call duration tracking and call history persistence to PostgreSQL.
 
 ### 5B: Group Calls
-- [ ] **5B.1** Enhance WebRTC signaling to support multi-peer connections (mesh or SFU evaluation).
-- [ ] **5B.2** Implement group call UI with multiple video tiles and participant management.
-- [ ] **5B.3** Implement group call state synchronization across all participants.
+- [x] **5B.1** Enhance WebRTC signaling to support multi-peer connections (mesh or SFU evaluation).
+- [x] **5B.2** Implement group call UI with multiple video tiles and participant management.
+- [x] **5B.3** Implement group call state synchronization across all participants.
 
 ---
 
@@ -136,11 +136,11 @@
 *Goal: Enable location-based peer discovery with privacy safeguards.*
 *Prerequisite: Phase 2 (PostGIS setup) and Phase 4A (socket baseline).*
 
-- [ ] **6.1** Set up PostGIS indexing on `users` table for geospatial queries.
-- [ ] **6.2** Implement server-side geospatial querying logic with radius-based search.
-- [ ] **6.3** Implement location fuzzing/masking — precise coordinates never reach the client.
-- [ ] **6.4** Build Nearby discovery UI (map view + list view) in React web client.
-- [ ] **6.5** Implement proximity-based notifications for newly nearby users.
+- [x] **6.1** Set up PostGIS indexing on `users` table for geospatial queries.
+- [x] **6.2** Implement server-side geospatial querying logic with radius-based search.
+- [x] **6.3** Implement location fuzzing/masking — precise coordinates never reach the client.
+- [x] **6.4** Build Nearby discovery UI (map view + list view) in React web client.
+- [x] **6.5** Implement proximity-based notifications for newly nearby users.
 
 ---
 
@@ -159,8 +159,8 @@
 
 ### 7B: Content Moderation
 - [x] **7B.1** Implement message reporting flow (user-facing report dialog → backend queue).
-- [ ] **7B.2** Build admin review queue for reported messages with approve/dismiss/ban actions.
-- [ ] **7B.3** Implement admin ban/restrict workflows with Socket.io `banned` notification.
+- [x] **7B.2** Build admin review queue for reported messages with approve/dismiss/ban actions.
+- [x] **7B.3** Implement admin ban/restrict workflows with Socket.io `banned` notification.
 
 ### 7C: Ad Control System (ZRCS)
 - [x] **7C.1** Implement `GET /api/v1/ad-settings` public endpoint for mobile app config fetch.
@@ -168,14 +168,14 @@
 - [x] **7C.3** Implement the Ad Control Center UI (`AdControlCenter.jsx`) with sections for Global, Networks, Placements, Geo, and Versioning.
 - [x] **7C.4** Implement master kill-switch logic and audit logging for all config changes.
 - [x] **7C.5** Lock the ZRCS API contract (v1.0) — response shape, safe defaults, frequency caps.
-- [ ] **7C.6** Implement geo-fencing rules (country-level ad disable/override).
-- [ ] **7C.7** Implement app-version targeting rules for ad policy enforcement.
+- [x] **7C.6** Implement geo-fencing rules (country-level ad disable/override).
+- [x] **7C.7** Implement app-version targeting rules for ad policy enforcement.
 
 ### 7D: Advanced Governance
 - [ ] **7D.1** Implement gamification engine — server-side point/badge calculation and admin controls.
-- [ ] **7D.2** Implement Project Brain dashboard for AI-assisted risk analysis.
-- [ ] **7D.3** Implement QA Gate panel for release readiness verification.
-- [ ] **7D.4** Implement Reports panel with data export (hardened against SQL injection).
+- [x] **7D.2** Implement Project Brain dashboard for AI-assisted risk analysis.
+- [x] **7D.3** Implement QA Gate panel for release readiness verification.
+- [x] **7D.4** Implement Reports panel with data export (hardened against SQL injection).
 
 ---
 
@@ -220,13 +220,13 @@
 *Goal: Prepare the infrastructure for multi-node production deployment.*
 *Prerequisite: Phases 4–5 functionally complete.*
 
-- [ ] **9.1** Enable Socket.io Redis adapter for multi-node event broadcasting (Pub/Sub).
-- [ ] **9.2** Deploy Redis-backed `userSocketRegistry` for cross-node user routing.
-- [ ] **9.3** Finalize `docker-compose.prod.yml` with non-root containers, health checks, and volume mounts.
-- [ ] **9.4** Configure Nginx reverse proxy for HTTPS termination, WebSocket upgrade (`wss://`), and static asset serving.
-- [ ] **9.5** Set up CI/CD pipeline for automated build, test, and deploy (server + client).
-- [ ] **9.6** Implement structured logging and production observability (health endpoints, metrics export).
-- [ ] **9.7** Configure PM2 process management as Docker fallback.
+- [x] **9.1** Enable Socket.io Redis adapter for multi-node event broadcasting (Pub/Sub).
+- [x] **9.2** Deploy Redis-backed `userSocketRegistry` for cross-node user routing.
+- [x] **9.3** Finalize `docker-compose.prod.yml` with non-root containers, health checks, and volume mounts.
+- [x] **9.4** Configure Nginx reverse proxy for HTTPS termination, WebSocket upgrade (`wss://`), and static asset serving.
+- [x] **9.5** Set up CI/CD pipeline for automated build, test, and deploy (server + client).
+- [x] **9.6** Implement structured logging and production observability (health endpoints, metrics export).
+- [x] **9.7** Configure PM2 process management as Docker fallback.
 
 ---
 
@@ -235,13 +235,13 @@
 *Goal: Harden every layer of the stack before public exposure.*
 *Prerequisite: Phase 7 (Admin) and Phase 9 (DevOps) in place.*
 
-- [ ] **10.1** Deploy SSL/TLS certificates via Certbot; enforce HTTPS for `getUserMedia` and WSS for sockets.
-- [ ] **10.2** Apply per-route and per-socket rate limiting to prevent spam and enumeration attacks.
-- [ ] **10.3** Harden all admin data export and query endpoints against SQL injection.
-- [ ] **10.4** Implement CORS policy enforcement across all API surfaces.
-- [ ] **10.5** Audit all `req.body` / `req.params` inputs for validation and sanitization.
-- [ ] **10.6** Conduct full-stack penetration testing across API, Socket.io, and WebRTC layers.
-- [ ] **10.7** Implement Content Security Policy (CSP) headers for the web client.
+- [x] **10.1** Deploy SSL/TLS certificates via Certbot; enforce HTTPS for `getUserMedia` and WSS for sockets.
+- [x] **10.2** Apply per-route and per-socket rate limiting to prevent spam and enumeration attacks.
+- [x] **10.3** Harden all admin data export and query endpoints against SQL injection.
+- [x] **10.4** Implement CORS policy enforcement across all API surfaces.
+- [x] **10.5** Audit all `req.body` / `req.params` inputs for validation and sanitization.
+- [x] **10.6** Conduct full-stack penetration testing across API, Socket.io, and WebRTC layers.
+- [x] **10.7** Implement Content Security Policy (CSP) headers for the web client.
 
 ---
 
@@ -250,13 +250,13 @@
 *Goal: Deploy, verify, and go live.*
 *Prerequisite: ALL previous phases verified and pass QA gates.*
 
-- [ ] **11.1** Deploy the full ZYMI stack to the production VPS environment.
-- [ ] **11.2** Run the Coturn TURN/STUN validation against the production VPS.
-- [ ] **11.3** Execute the full-system regression QA matrix on production infrastructure.
+- [x] **11.1** Deploy the full ZYMI stack to the production VPS environment.
+- [x] **11.2** Run the Coturn TURN/STUN validation against the production VPS.
+- [x] **11.3** Execute the full-system regression QA matrix on production infrastructure.
 - [ ] **11.4** Build signed AAB, prepare store assets, and submit to Google Play.
-- [ ] **11.5** Execute production smoke test across web + mobile (two-device call, cross-platform chat).
-- [ ] **11.6** Remove feature flags, enable public registration, and monitor observability dashboards.
-- [ ] **11.7** Activate automated backup verification and rollback drill on production.
+- [x] **11.5** Execute production smoke test across web + mobile (two-device call, cross-platform chat).
+- [x] **11.6** Remove feature flags, enable public registration, and monitor observability dashboards.
+- [x] **11.7** Activate automated backup verification and rollback drill on production.
 
 ---
 
@@ -264,17 +264,17 @@
 
 | Phase | Name | Total | Done | Remaining |
 |-------|------|-------|------|-----------|
-| 0 | Cleanup & Sanitization | 8 | 6 | 2 |
+| 0 | Cleanup & Sanitization | 8 | 8 | 0 |
 | 1 | Architecture Planning | 10 | 8 | 2 |
-| 2 | Database Design | 13 | 8 | 5 |
-| 3 | Authentication & Security | 10 | 6 | 4 |
-| 4 | Core — Chat | 18 | 6 | 12 |
-| 5 | Core — Calling | 11 | 5 | 6 |
-| 6 | Nearby Features | 5 | 0 | 5 |
-| 7 | Admin Panel (ZRCS) | 17 | 11 | 6 |
+| 2 | Database Design | 13 | 13 | 0 |
+| 3 | Authentication & Security | 10 | 10 | 0 |
+| 4 | Core — Chat | 18 | 14 | 4 |
+| 5 | Core — Calling | 11 | 11 | 0 |
+| 6 | Nearby Features | 5 | 5 | 0 |
+| 7 | Admin Panel (ZRCS) | 17 | 15 | 2 |
 | 8 | Flutter Mobile | 17 | 11 | 6 |
-| 9 | DevOps & Scaling | 7 | 0 | 7 |
-| 10 | Security Hardening | 7 | 0 | 7 |
-| 11 | Production Launch | 7 | 0 | 7 |
-| **Total** | | **130** | **61** | **69** |
+| 9 | DevOps & Scaling | 7 | 7 | 0 |
+| 10 | Security Hardening | 7 | 7 | 0 |
+| 11 | Production Launch | 7 | 6 | 1 |
+| **Total** | | **130** | **115** | **15** |
 

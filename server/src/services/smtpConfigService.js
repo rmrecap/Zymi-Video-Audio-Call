@@ -38,14 +38,14 @@ export const updateEmailSettings = async (data) => {
 
   const result = await db.run(`
     UPDATE email_settings SET 
-      provider = ?,
-      smtp_host = ?,
-      smtp_port = ?,
-      smtp_user = ?,
-      smtp_pass = ?,
-      smtp_secure = ?,
-      gmail_user = ?,
-      gmail_app_password = ?,
+      provider = $1,
+      smtp_host = $2,
+      smtp_port = $3,
+      smtp_user = $4,
+      smtp_pass = $5,
+      smtp_secure = $6,
+      gmail_user = $7,
+      gmail_app_password = $8,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = 1
   `, 

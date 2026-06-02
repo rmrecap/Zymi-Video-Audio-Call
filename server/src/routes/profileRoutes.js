@@ -2,7 +2,6 @@ import { get, run } from '../db/postgres.js';
 import bcrypt from 'bcryptjs';
 import { incrementTokenVersion } from '../services/sessionService.js';
 import { logAudit } from '../services/auditService.js';
-import { getApp } from '../../index.js';
 import * as profileService from '../services/profileService.js';
 
 const mapUserToSettings = (user) => ({
@@ -157,10 +156,9 @@ export const changePassword = async (req, res) => {
     await logAudit(userId, 'password_change', userId, 'User changed password');
 
     // Disconnect all sockets for this user
-    const app = getApp();
-    const userSockets = app.get('userSockets');
-    const io = app.get('io');
-    const socketId = userSockets.get(userId);
+    const userSockets = req.app.get('userSockets');
+    const io = req.app.get('io');
+    const socketId = userSockets?.get(String(userId));
     if (socketId && io) {
       io.to(socketId).emit('force-logout', { reason: 'Password changed. Please log in again.' });
       userSockets.delete(userId);

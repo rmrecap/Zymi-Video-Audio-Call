@@ -9,33 +9,34 @@ const router = Router();
 router.get('/ice-servers', requireAuth, async (req, res) => {
   try {
     const country = req.query.country || null;
-    const servers = turnConfigService.getActiveIceServers(country);
+    const servers = await turnConfigService.getActiveIceServers(country);
     res.json(servers);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.get('/admin/servers', requireAdmin, (req, res) => {
+router.get('/admin/servers', requireAdmin, async (req, res) => {
   try {
-    res.json(turnConfigService.getTurnServers());
+    const servers = await turnConfigService.getTurnServers();
+    res.json(servers);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/admin/servers', requireAdmin, (req, res) => {
+router.post('/admin/servers', requireAdmin, async (req, res) => {
   try {
-    turnConfigService.addTurnServer(req.body);
+    await turnConfigService.addTurnServer(req.body);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.patch('/admin/servers/:id', requireAdmin, (req, res) => {
+router.patch('/admin/servers/:id', requireAdmin, async (req, res) => {
   try {
-    turnConfigService.updateTurnServer(req.params.id, req.body);
+    await turnConfigService.updateTurnServer(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -63,9 +64,10 @@ router.post('/admin/servers/:id/test', requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/admin/health-history/:id', requireAdmin, (req, res) => {
+router.get('/admin/health-history/:id', requireAdmin, async (req, res) => {
   try {
-    res.json(turnHealthCheckService.getHealthHistory(req.params.id));
+    const history = await turnHealthCheckService.getHealthHistory(req.params.id);
+    res.json(history);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

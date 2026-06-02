@@ -23,23 +23,19 @@ export const performHealthCheck = async () => {
     const startTime = Date.now();
 
     try {
-      // 1. Check STUN/TURN UDP (Basic reachability via socket)
-      health.udp = await checkUdpReachability(server.stun_url);
-      
-      // 2. Check TCP if configured
-      if (server.turn_url_tcp) {
-        health.tcp = await checkTcpReachability(server.turn_url_tcp);
-      }
+      const stunUrl = `stun:${server.host}:${server.port}`;
+      const turnUrl = `turn:${server.host}:${server.port}`;
 
-      // 3. Check TLS if configured
-      if (server.turn_url_tls) {
-        health.tls = await checkTlsReachability(server.turn_url_tls);
-      }
+      health.udp = await checkUdpReachability(stunUrl);
+
+      health.tcp = await checkTcpReachability(turnUrl);
+
+      health.tls = await checkTlsReachability(`turns:${server.host}:${server.port}`);
 
       health.latency = Date.now() - startTime;
       
       if (health.udp || health.tcp || health.tls) {
-        health.status = (health.udp && (server.turn_url_tls ? health.tls : true)) ? 'ok' : 'warning';
+        health.status = health.udp ? 'ok' : 'warning';
       }
 
     } catch (err) {

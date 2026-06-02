@@ -1,0 +1,17 @@
+name: Local Config
+version: 1.0.0
+schema: v1
+mcpServers:
+  - name: Fetch MCP Server
+    command: npx
+    args:
+      - -y
+      - @modelcontextprotocol/server-fetch
+    env: {}
+  - name: Filesystem MCP Server
+    command: npx
+    args:
+      - -y
+      - @modelcontextprotocol/server-filesystem
+      - "C:\\Users\\Administrator\\Desktop\\QiBo\\QiBo"
+    env: {}

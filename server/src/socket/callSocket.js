@@ -149,7 +149,8 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
           return;
         }
 
-        if (isBlocked(to, from)) {
+        const blocked = await isBlocked(to, from);
+        if (blocked) {
           safeEmit(SOCKET_EVENTS.CALL_REJECTED, { reason: 'Cannot call this user' });
           callActivity.totalCalls--;
           return;

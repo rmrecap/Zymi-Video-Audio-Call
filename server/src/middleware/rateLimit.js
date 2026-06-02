@@ -2,6 +2,8 @@ import { isProduction } from '../config/env.js';
 
 const rateLimit = {};
 
+let cleanupInterval = null;
+
 export const rateLimitMiddleware = (options = {}) => {
   const {
     windowMs = 60 * 1000,
@@ -17,22 +19,29 @@ export const rateLimitMiddleware = (options = {}) => {
     skipFailedRequests = false
   } = options;
 
-  const cleanup = () => {
-    const now = Date.now();
-    Object.keys(rateLimit).forEach(key => {
-      if (now - rateLimit[key].resetTime > windowMs) {
-        delete rateLimit[key];
-      }
-    });
-  };
-
-  setInterval(cleanup, windowMs);
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      Object.keys(rateLimit).forEach(key => {
+        if (now - rateLimit[key].resetTime > 60000) {
+          delete rateLimit[key];
+        }
+      });
+    }, 60000);
+  }
 
   return (req, res, next) => {
     const key = keyGenerator(req);
     const now = Date.now();
 
     if (!rateLimit[key]) {
+      rateLimit[key] = {
+        count: 0,
+        resetTime: now + windowMs
+      };
+    }
+
+    if (now > rateLimit[key].resetTime) {
       rateLimit[key] = {
         count: 0,
         resetTime: now + windowMs

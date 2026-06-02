@@ -11,14 +11,15 @@ RUN mkdir -p /app/data && \
 
 USER nodejs
 
-COPY --chown=nodejs:nodejs package*.json ./
+COPY --chown=nodejs:nodejs server/package*.json ./
+COPY --chown=nodejs:nodejs server/src/ ./src/
+COPY --chown=nodejs:nodejs server/migrations/ ./migrations/
+COPY --chown=nodejs:nodejs server/index.js ./
 
 RUN npm ci --only=production
 
-COPY --chown=nodejs:nodejs src/ ./src/
-COPY --chown=nodejs:nodejs migrations/ ./migrations/
-COPY --chown=nodejs:nodejs shared/ ./shared/
-COPY --chown=nodejs:nodejs index.js ./
+RUN mkdir -p /app/shared
+COPY --chown=nodejs:nodejs shared/socketEvents.js ./shared/socketEvents.js
 
 EXPOSE 5000
 

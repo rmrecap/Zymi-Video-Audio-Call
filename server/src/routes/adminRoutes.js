@@ -4,7 +4,6 @@ import { logAudit, getAuditLogs, getAuditStats } from '../services/auditService.
 import { getMetricsSummary } from '../services/metricsService.js';
 import { incrementTokenVersion } from '../services/sessionService.js';
 import { requireAdmin, checkPermission, getUserPermissions, USER_ROLES } from '../middleware/authMiddleware.js';
-import { getApp } from '../../index.js';
 import { getUserSocketRegistry } from '../socket/userSocketRegistry.js';
 import { analyzeAdminInsights } from '../services/aiService.js';
 
@@ -297,10 +296,9 @@ export const changePassword = async (req, res) => {
     incrementTokenVersion(req.adminUser.id);
     logAudit(req.adminUser.id, 'password_change', req.adminUser.id, 'Admin changed password');
 
-    const app = getApp();
-    const userSockets = app.get('userSockets');
-    const io = app.get('io');
-    const socketId = userSockets.get(req.adminUser.id);
+    const userSockets = req.app.get('userSockets');
+    const io = req.app.get('io');
+    const socketId = userSockets?.get(String(req.adminUser.id));
     if (socketId && io) {
       io.to(socketId).emit('force-logout', { reason: 'Password changed. Please log in again.' });
       userSockets.delete(req.adminUser.id);
@@ -442,7 +440,7 @@ export const getCallHealth = async (req, res) => {
     const activeCalls = callActivity.activeCalls || 0;
 
     let averageCallDuration = 0;
-    const avgResult = await get('SELECT AVG(duration_seconds) as avg FROM call_history WHERE duration_seconds IS NOT NULL AND duration_seconds > 0');
+    const avgResult = await get('SELECT AVG(duration) as avg FROM call_history WHERE duration IS NOT NULL AND duration > 0');
     if (avgResult && avgResult.avg !== null) {
       averageCallDuration = Math.round(avgResult.avg);
     }
@@ -486,37 +484,19 @@ export const getCallHealth = async (req, res) => {
 
 export const getSocketRegistryHealth = (req, res) => {
   try {
-    const registry = getUserSocketRegistry();
-    const health = registry.getRegistryHealth();
-
-    // Add computed safety fields
-    const response = {
-      ...health,
-      productionDisabled: process.env.NODE_ENV === 'production',
+    const health = {
+      localMapSize: req.app.get('userSockets')?.size || 0,
+      redisAvailable: false,
       routingMode: 'local-map-primary',
       warnings: []
     };
 
-    // Add safety warnings
-    if (response.productionDisabled && response.shadowMode) {
-      response.warnings.push('Shadow mode should be disabled in production');
-    }
-
-    if (!response.productionDisabled && !response.shadowMode) {
-      response.warnings.push('Shadow mode available for development testing');
-    }
-
-    response.warnings.push('All socket routing uses local Map (single-node safe)');
-
-    res.json(response);
+    res.json(health);
   } catch (err) {
     res.status(500).json({
       error: 'Failed to fetch socket registry health',
       details: err.message,
       localMapSize: 0,
-      shadowMode: false,
-      redisAvailable: false,
-      productionDisabled: process.env.NODE_ENV === 'production',
       routingMode: 'local-map-primary',
       warnings: ['Registry health check failed']
     });
