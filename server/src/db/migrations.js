@@ -31,6 +31,16 @@ const indexExists = async (indexName) => {
 export const runMigrations = async () => {
   console.log('[MIGRATION] Starting PostgreSQL database migrations...');
   try {
+    const testResult = await exec('SELECT 1');
+    if (!testResult || testResult.rows?.length === 0) {
+      console.warn('[MIGRATION] No database available — skipping migrations');
+      return;
+    }
+  } catch (e) {
+    console.warn('[MIGRATION] No database available — skipping migrations:', e.message);
+    return;
+  }
+  try {
     await exec('CREATE EXTENSION IF NOT EXISTS postgis');
     console.log('[MIGRATION] PostGIS extension enabled');
   } catch (e) {
@@ -98,6 +108,10 @@ export const runMigrations = async () => {
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS hobby TEXT');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS family_members JSONB');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_status TEXT DEFAULT \'free\'');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_status TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_status_emoji TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS status_expires_at TIMESTAMP');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS available_hours JSONB');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_server TEXT');
     console.log('[MIGRATION] users table columns verified with profile fields');
   } catch (e) {
@@ -713,6 +727,148 @@ if (!(await indexExists('idx_messages_conversation'))) {
     )
   `);
   console.log('[MIGRATION] call_history table ready');
+
+  // ─── GROUPS ────────────────────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS groups (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      avatar TEXT,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      is_encrypted BOOLEAN DEFAULT FALSE,
+      encryption_key TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  console.log('[MIGRATION] groups table ready');
+
+  // ─── GROUP MEMBERS ─────────────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS group_members (
+      id SERIAL PRIMARY KEY,
+      group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      role TEXT DEFAULT 'member',
+      joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(group_id, user_id)
+    )
+  `);
+  console.log('[MIGRATION] group_members table ready');
+
+  // ─── GROUP MESSAGES ────────────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS group_messages (
+      id SERIAL PRIMARY KEY,
+      group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+      sender_id INTEGER NOT NULL REFERENCES users(id),
+      content TEXT NOT NULL,
+      message_type TEXT DEFAULT 'text',
+      file_url TEXT,
+      file_name TEXT,
+      file_size INTEGER,
+      mime_type TEXT,
+      metadata TEXT,
+      client_message_id TEXT,
+      is_edited BOOLEAN DEFAULT FALSE,
+      edited_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await exec('CREATE INDEX IF NOT EXISTS idx_group_messages_group ON group_messages(group_id, created_at)');
+  console.log('[MIGRATION] group_messages table ready');
+
+  // ─── GROUP MESSAGE READ STATUS ─────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS group_message_reads (
+      id SERIAL PRIMARY KEY,
+      group_message_id INTEGER NOT NULL REFERENCES group_messages(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(group_message_id, user_id)
+    )
+  `);
+  console.log('[MIGRATION] group_message_reads table ready');
+
+  // ─── USER POINTS / GAMIFICATION ────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS user_points (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+      points INTEGER DEFAULT 0,
+      level INTEGER DEFAULT 1,
+      messages_sent INTEGER DEFAULT 0,
+      calls_made INTEGER DEFAULT 0,
+      call_duration_seconds INTEGER DEFAULT 0,
+      days_active INTEGER DEFAULT 0,
+      last_active_date TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  console.log('[MIGRATION] user_points table ready');
+
+  // ─── BADGES ────────────────────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS badges (
+      id SERIAL PRIMARY KEY,
+      badge_key TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      icon TEXT,
+      points_required INTEGER DEFAULT 0,
+      category TEXT DEFAULT 'general'
+    )
+  `);
+  // Seed badges
+  const badgesToSeed = [
+    ['first_message', 'First Message', 'Send your first message', '💬', 10, 'chat'],
+    ['chatty', 'Chatty', 'Send 100 messages', '🗣️', 100, 'chat'],
+    ['talkative', 'Talkative', 'Send 500 messages', '💭', 500, 'chat'],
+    ['first_call', 'First Call', 'Make your first call', '📞', 10, 'calls'],
+    ['socializer', 'Socializer', 'Make 50 calls', '📱', 50, 'calls'],
+    ['globetrotter', 'Globetrotter', 'Connect from 5 different locations', '🌍', 0, 'social'],
+    ['early_adopter', 'Early Adopter', 'Joined in the first month', '🌟', 0, 'special'],
+    ['friends', 'Friendly', 'Chat with 10 different users', '👥', 10, 'social'],
+    ['night_owl', 'Night Owl', 'Active past midnight', '🦉', 0, 'special'],
+    ['streak_7', '7-Day Streak', 'Active for 7 consecutive days', '🔥', 7, 'streaks']
+  ];
+  for (const [key, name, desc, icon, points, cat] of badgesToSeed) {
+    await run(
+      `INSERT INTO badges (badge_key, name, description, icon, points_required, category)
+       VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (badge_key) DO NOTHING`,
+      [key, name, desc, icon, points, cat]
+    );
+  }
+  console.log('[MIGRATION] badges table ready');
+
+  // ─── USER BADGES ───────────────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS user_badges (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      badge_id INTEGER NOT NULL REFERENCES badges(id),
+      earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, badge_id)
+    )
+  `);
+  console.log('[MIGRATION] user_badges table ready');
+
+  // ─── ACHIEVEMENTS ──────────────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS achievements (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      achievement_key TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      xp_rewarded INTEGER DEFAULT 0,
+      earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, achievement_key)
+    )
+  `);
+  console.log('[MIGRATION] achievements table ready');
 
   console.log('[MIGRATION] All PostgreSQL migrations complete ✓');
 };

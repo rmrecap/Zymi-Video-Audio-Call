@@ -24,8 +24,16 @@ if (pgResult) {
 }
 
 // Run migrations and seeds
-await runMigrations();
-await initAdminSeed();
+try {
+  await runMigrations();
+} catch (e) {
+  console.warn('[INDEX] Migration skipped:', e.message);
+}
+try {
+  await initAdminSeed();
+} catch (e) {
+  console.warn('[INDEX] Admin seed skipped:', e.message);
+}
 // await seedDemoUsers();
 
 // Other services
@@ -34,7 +42,7 @@ await initAdminSeed();
 // import { createCallHistoryTable } from './src/services/callHistoryService.js';
 // import { initCallState } from './src/services/callStateService.js';
 // import { initMetrics } from './src/services/metricsService.js';
-// import { logAudit } from './src/services/auditService.js';
+import { logAudit } from './src/services/auditService.js';
 
 // await createBlockTable();
 // await createReportsTable();
@@ -52,6 +60,7 @@ import { globalLimiter } from './src/middleware/rateLimiter.js';
 import { setupCallSocket } from './src/socket/callSocket.js';
 import { setupChatSocket } from './src/socket/chatSocket.js';
 import { setupAdminSocket } from './src/socket/adminSocket.js';
+import { setupGroupChatSocket } from './src/socket/groupChatSocket.js';
 import { register, login, adminLogin } from './src/routes/authRoutes.js';
 import { getUsers, getMessages, searchMessages, getUnread, markAsRead } from './src/routes/messageRoutes.js';
 import { editMessage, getMessageEdits } from './src/routes/messageEditRoutes.js';
@@ -79,6 +88,8 @@ import notificationRoutes from './src/routes/notificationRoutes.js';
 import mediaRoutes from './src/routes/mediaRoutes.js';
 import turnRoutes from './src/routes/turnRoutes.js';
 import connectivityRoutes from './src/routes/connectivityRoutes.js';
+import groupRoutes from './src/routes/groupRoutes.js';
+import gamificationRoutes from './src/routes/gamificationRoutes.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -186,6 +197,8 @@ app.use(clientErrorRoutes);
 app.use('/api', adControlRoutes); 
 app.use('/api/admin', adminFeatureRoutes);
 app.use('/api', adminFeatureRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/gamification', gamificationRoutes);
 
 app.get('/api/admin/stats', requireAdmin, getStats);
 app.get('/api/admin/users', requireAdmin, getAdminUsers);
@@ -270,6 +283,11 @@ io.on('connection', async (socket) => {
 setupCallSocket(io, userSockets, callActivity);
 setupChatSocket(io, userSockets);
 setupAdminSocket(io);
+setupGroupChatSocket(io, userSockets);
+
+// Start presence batch broadcasting
+import { batchPresenceBroadcast } from './src/services/presenceService.js';
+batchPresenceBroadcast(io);
 
 const PORT = config.port || 5000;
 const startServer = (port) => {

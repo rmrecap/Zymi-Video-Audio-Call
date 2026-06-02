@@ -20,7 +20,28 @@ export const SOCKET_EVENTS = {
   USER_OFFLINE: 'user-offline',
   BANNED: 'banned',
   CALL_FAILED: 'call-failed',
-  MESSAGE_SEEN: 'message-seen'
+  MESSAGE_SEEN: 'message-seen',
+  GROUP_CREATE: 'group-create',
+  GROUP_CREATED: 'group-created',
+  GROUP_INVITE: 'group-invite',
+  GROUP_JOIN: 'group-join',
+  GROUP_LEAVE: 'group-leave',
+  GROUP_MESSAGE: 'group-message',
+  GROUP_MESSAGE_SENT: 'group-message-sent',
+  GROUP_NEW_MESSAGE: 'group-new-message',
+  GROUP_ADD_MEMBER: 'group-add-member',
+  GROUP_REMOVE_MEMBER: 'group-remove-member',
+  GROUP_MEMBER_ADDED: 'group-member-added',
+  GROUP_MEMBER_REMOVED: 'group-member-removed',
+  GROUP_UPDATE: 'group-update',
+  GROUP_UPDATED: 'group-updated',
+  GROUP_DELETE: 'group-delete',
+  GROUP_DELETED: 'group-deleted',
+  GROUP_TYPING: 'group-typing',
+  GROUP_STOP_TYPING: 'group-stop-typing',
+  STATUS_UPDATE: 'status-update',
+  STATUS_CHANGED: 'status-changed',
+  PRESENCE_BATCH: 'presence-batch'
 };
 
 export const ADMIN_SOCKET_EVENTS = {
@@ -105,7 +126,13 @@ export const LOCKED_SOCKET_EVENTS = [
   SOCKET_EVENTS.END_CALL,
   SOCKET_EVENTS.REJECT_CALL,
   SOCKET_EVENTS.TYPING,
-  SOCKET_EVENTS.STOP_TYPING
+  SOCKET_EVENTS.STOP_TYPING,
+  SOCKET_EVENTS.GROUP_CREATE,
+  SOCKET_EVENTS.GROUP_MESSAGE,
+  SOCKET_EVENTS.GROUP_ADD_MEMBER,
+  SOCKET_EVENTS.GROUP_REMOVE_MEMBER,
+  SOCKET_EVENTS.GROUP_UPDATE,
+  SOCKET_EVENTS.GROUP_DELETE
 ];
 
 export const CALL_TYPES = {

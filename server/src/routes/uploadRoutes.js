@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { validateAndCompress, compressBuffer } from '../services/imageCompressionService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,19 +110,37 @@ export const uploadMessageFile = async (req, res) => {
     return res.status(400).json({ error: validation.error });
   }
 
-  const fileUrl = saveMessageFile(file.data, file.name, req.user.id);
+  let fileData = file.data;
+  let compressionResult = null;
+
   const ext = path.extname(file.name).toLowerCase();
-  
   let mediaType = 'document';
   if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) mediaType = 'image';
   else if (['.mp4', '.webm'].includes(ext)) mediaType = 'video';
 
+  if (mediaType === 'image') {
+    try {
+      const result = await compressBuffer(fileData, file.mimetype);
+      fileData = result.buffer;
+      compressionResult = {
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize,
+        savingsPercent: result.savingsPercent
+      };
+    } catch (compressErr) {
+      console.warn('[UPLOAD] Image compression failed, using original:', compressErr.message);
+    }
+  }
+
+  const fileUrl = saveMessageFile(fileData, file.name, req.user.id);
+
   res.json({
     url: fileUrl,
     fileName: file.name,
-    fileSize: file.size,
+    fileSize: fileData.length,
     mimeType: file.mimetype,
-    mediaType
+    mediaType,
+    compression: compressionResult
   });
 };
 

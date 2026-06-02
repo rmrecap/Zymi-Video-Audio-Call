@@ -1,7 +1,8 @@
 import { SOCKET_EVENTS } from '../../shared/socketEvents.js';
 import { get, all, run } from '../db/postgres.js';
 import { incrementMessagesToday, incrementTypingEvents, incrementDisconnects } from '../services/metricsService.js';
-import { shouldBroadcastOnline } from '../services/presenceService.js';
+import { shouldBroadcastOnline, getUserStatus, queuePresenceBroadcast } from '../services/presenceService.js';
+import { incrementMessagesSent } from '../services/gamificationService.js';
 import { registry } from './userSocketRegistry.js';
 import { cleanupUserActiveCall } from './callState.js';
 import * as messageQueueService from '../services/messageQueueService.js';
@@ -55,6 +56,10 @@ export const setupChatSocket = (io, userSockets) => {
         socket.join(normalizedUserId);
         userSockets.set(normalizedUserId, socket.id);
 
+        // Track the number of active sockets for this user for presence optimization
+        const roomSockets = await io.in(normalizedUserId).fetchSockets();
+        const isFirstConnection = roomSockets.length <= 1;
+
         // Register in production-wired Redis registry (multi-type)
         try {
           await registry.register(normalizedUserId, socket.id, socketType);
@@ -75,9 +80,19 @@ export const setupChatSocket = (io, userSockets) => {
         const unreadTotal = await unreadCounterService.getTotalUnread(normalizedUserId);
         socket.emit('unread-count-updated', { total: unreadTotal });
 
-        // Only broadcast online status if visibility is enabled
-        if (await shouldBroadcastOnline(userId)) {
-          socket.broadcast.emit(SOCKET_EVENTS.USER_ONLINE, { userId: String(userId) });
+        // Only broadcast online status if visibility is enabled and it's the first connection
+        if (isFirstConnection && (await shouldBroadcastOnline(userId))) {
+          const status = await getUserStatus(userId);
+          socket.broadcast.emit(SOCKET_EVENTS.USER_ONLINE, {
+            userId: String(userId),
+            custom_status: status.custom_status,
+            custom_status_emoji: status.custom_status_emoji
+          });
+          queuePresenceBroadcast(String(userId), {
+            online: true,
+            custom_status: status.custom_status,
+            custom_status_emoji: status.custom_status_emoji
+          });
         }
 
         // Phase 99: Send list of currently online users to the joining user
@@ -177,6 +192,7 @@ export const setupChatSocket = (io, userSockets) => {
         }
 
         incrementMessagesToday();
+        incrementMessagesSent(socket.userId);
       } catch (err) {
         console.error('[CHAT_SOCKET] PRIVATE_MESSAGE error:', err);
       }
@@ -354,6 +370,7 @@ export const setupChatSocket = (io, userSockets) => {
             // Only broadcast offline if user was visible to others
             if (socket.onlineVisibility !== false) {
               socket.broadcast.emit(SOCKET_EVENTS.USER_OFFLINE, { userId: String(userId) });
+              queuePresenceBroadcast(String(userId), { online: false });
             }
             incrementDisconnects();
           } else {

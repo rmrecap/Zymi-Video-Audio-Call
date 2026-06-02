@@ -1,7 +1,13 @@
 import pg from 'pg';
 import os from 'os';
 import { config, isProduction } from '../config/env.js';
-import { db as sqlite } from './sqlite_provider.js';
+
+let sqlite = null;
+try {
+  sqlite = (await import('./sqlite_provider.js')).db;
+} catch (e) {
+  console.warn('[POSTGRES] SQLite fallback not available:', e.message);
+}
 
 const { Pool } = pg;
 
@@ -75,9 +81,12 @@ export const query = async (text, params) => {
   }
 };
 
+const noopResult = () => ({ rows: [], rowCount: 0, lastID: null, changes: 0 });
+
 export const get = async (text, ...params) => {
   const flattenedParams = params.flat();
   if (!pool) {
+    if (!sqlite) return null;
     return sqlite.get(text, flattenedParams);
   }
   const res = await query(text, flattenedParams);
@@ -87,6 +96,7 @@ export const get = async (text, ...params) => {
 export const all = async (text, ...params) => {
   const flattenedParams = params.flat();
   if (!pool) {
+    if (!sqlite) return [];
     return sqlite.all(text, flattenedParams);
   }
   const res = await query(text, flattenedParams);
@@ -96,6 +106,7 @@ export const all = async (text, ...params) => {
 export const run = async (text, ...params) => {
   const flattenedParams = params.flat();
   if (!pool) {
+    if (!sqlite) return noopResult();
     return sqlite.run(text, flattenedParams);
   }
   const res = await query(text, flattenedParams);
@@ -107,7 +118,7 @@ export const run = async (text, ...params) => {
 
 export const exec = async (text) => {
   if (!pool) {
-    // SQLite doesn't have a direct exec in our provider but we can simulate
+    if (!sqlite) return noopResult();
     return sqlite.run(text);
   }
   return query(text);
@@ -117,6 +128,9 @@ export const exec = async (text) => {
  * Runs a set of operations within a transaction.
  */
 export const withTransaction = async (callback) => {
+  if (!pool) {
+    throw new Error('PostgreSQL not initialized. Transactions require PostgreSQL.');
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
