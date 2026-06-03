@@ -897,6 +897,29 @@ export const runMigrations = async () => {
   `);
   console.log('[MIGRATION] achievements table ready');
 
+  // ─── RLS AUTO-ENABLE SECURITY PATCH ────────────────────────────────────────
+  // Revoke public API execution on Supabase's internal rls_auto_enable() helper
+  // so it is not exposed via PostgREST /rest/v1/rpc/.
+  try {
+    await exec(`
+      DO $$ BEGIN
+        -- Only patch if the function exists (Supabase-specific internal helper)
+        IF EXISTS (
+          SELECT 1 FROM pg_proc p
+          JOIN pg_namespace n ON p.pronamespace = n.oid
+          WHERE n.nspname = 'public' AND p.proname = 'rls_auto_enable'
+        ) THEN
+          ALTER FUNCTION public.rls_auto_enable() SECURITY DEFINER;
+          REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
+          GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO service_role, postgres;
+        END IF;
+      END $$;
+    `);
+    console.log('[MIGRATION] RLS auto-enable function secured ✓');
+  } catch (e) {
+    console.warn('[MIGRATION] RLS auto-enable security patch skipped (non-Supabase or insufficient permissions):', e.message);
+  }
+
   console.log('[MIGRATION] All PostgreSQL migrations complete ✓');
 };
 
