@@ -149,7 +149,7 @@ export const runMigrations = async () => {
       metadata TEXT
     )
   `);
-if (!(await indexExists('idx_messages_conversation'))) {
+  if (!(await indexExists('idx_messages_conversation'))) {
     try {
       await exec('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)');
     } catch (e) {
@@ -158,6 +158,15 @@ if (!(await indexExists('idx_messages_conversation'))) {
   }
   if (!(await indexExists('idx_messages_client_id'))) {
     await exec('CREATE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id)');
+  }
+  try {
+    await exec("ALTER TABLE messages ADD COLUMN IF NOT EXISTS encryption_key_id TEXT");
+    await exec("ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT FALSE");
+    await exec("ALTER TABLE messages ADD COLUMN IF NOT EXISTS encrypted_content TEXT");
+    await exec("ALTER TABLE messages ADD COLUMN IF NOT EXISTS nonce TEXT");
+    console.log('[MIGRATION] messages E2EE columns verified');
+  } catch (e) {
+    console.warn('[MIGRATION] Could not add E2EE columns to messages:', e.message);
   }
 
   // ─── ADMIN AUDIT LOGS ─────────────────────────────────────────────────────
@@ -711,6 +720,24 @@ if (!(await indexExists('idx_messages_conversation'))) {
     )
   `);
   console.log('[MIGRATION] message_reports table ready');
+
+  // ─── GROUP CALL HISTORY ────────────────────────────────────────────────────
+  if (!(await tableExists('group_call_history'))) {
+    await exec(`
+      CREATE TABLE IF NOT EXISTS group_call_history (
+        id SERIAL PRIMARY KEY,
+        group_id INTEGER NOT NULL,
+        initiator_id INTEGER NOT NULL REFERENCES users(id),
+        call_type TEXT NOT NULL,
+        duration INTEGER DEFAULT 0,
+        participant_count INTEGER DEFAULT 0,
+        participant_ids TEXT,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[MIGRATION] group_call_history table ready');
+  }
 
   // ─── CALL HISTORY ─────────────────────────────────────────────────────────
   await exec(`

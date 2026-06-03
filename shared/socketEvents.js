@@ -41,7 +41,22 @@ export const SOCKET_EVENTS = {
   GROUP_STOP_TYPING: 'group-stop-typing',
   STATUS_UPDATE: 'status-update',
   STATUS_CHANGED: 'status-changed',
-  PRESENCE_BATCH: 'presence-batch'
+  PRESENCE_BATCH: 'presence-batch',
+  GROUP_CALL_START: 'group-call-start',
+  GROUP_CALL_STARTED: 'group-call-started',
+  GROUP_CALL_JOIN: 'group-call-join',
+  GROUP_CALL_JOINED: 'group-call-joined',
+  GROUP_CALL_LEAVE: 'group-call-leave',
+  GROUP_CALL_LEFT: 'group-call-left',
+  GROUP_CALL_END: 'group-call-end',
+  GROUP_CALL_ENDED: 'group-call-ended',
+  GROUP_CALL_OFFER: 'group-call-offer',
+  GROUP_CALL_ANSWER: 'group-call-answer',
+  GROUP_CALL_ICE_CANDIDATE: 'group-call-ice-candidate',
+  GROUP_CALL_REJECT: 'group-call-reject',
+  GROUP_CALL_REJECTED: 'group-call-rejected',
+  GROUP_CALL_TIMEOUT: 'group-call-timeout',
+  GROUP_CALL_PARTICIPANTS: 'group-call-participants'
 };
 
 export const ADMIN_SOCKET_EVENTS = {

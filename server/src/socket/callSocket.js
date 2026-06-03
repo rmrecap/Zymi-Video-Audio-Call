@@ -5,6 +5,7 @@ import { startCall, endCall, rejectCall as rejectCallDB, getCurrentCall } from '
 import { CALL_TIMEOUT_MS, addPendingCall, removePendingCall, startCallTimeout, clearCallTimeout, handleCallTimeout } from '../services/callStateService.js';
 import { registerActiveCall, clearActiveCall, cleanupUserActiveCall } from './callState.js';
 import { registry } from './userSocketRegistry.js';
+import * as groupChatService from '../services/groupChatService.js';
 
 import { getRedisClient } from './redisAdapter.js';
 import { get } from '../db/postgres.js';
@@ -335,7 +336,282 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
       if (socket.userId) {
         cleanupUserActiveCall(socket.userId, io, userSockets);
       }
+      for (const [callId, state] of groupCalls.entries()) {
+        if (state.participants.includes(String(socket.userId))) {
+          state.participants = state.participants.filter(p => p !== String(socket.userId));
+          if (state.participants.length === 0) {
+            state.active = false;
+            removeGroupCallState(callId);
+          }
+        }
+      }
+      clearInterval(groupCallCleanupInterval);
     });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Group Call Signaling (Phase 5B)
+    // ═══════════════════════════════════════════════════════════════════
+
+    const groupCalls = new Map();
+
+    const getGroupCallState = (callId) => {
+      return groupCalls.get(callId) || null;
+    };
+
+    const setGroupCallState = (callId, state) => {
+      groupCalls.set(callId, state);
+    };
+
+    const removeGroupCallState = (callId) => {
+      groupCalls.delete(callId);
+    };
+
+    socket.on(SOCKET_EVENTS.GROUP_CALL_START, async (data) => {
+      try {
+        const { groupId, callType, offer } = data || {};
+        if (!groupId || !callType || !offer || !socket.userId) return;
+
+        const callId = `group_${groupId}_${Date.now()}`;
+        const members = await groupChatService.getMembers(groupId);
+        const isMember = members.some(m => String(m.id) === String(socket.userId) && m.role);
+        if (!isMember) return;
+
+        const participants = [String(socket.userId)];
+        setGroupCallState(callId, {
+          callId,
+          groupId,
+          callType,
+          initiator: socket.userId,
+          participants,
+          startTime: Date.now(),
+          active: true
+        });
+
+        for (const member of members) {
+          if (String(member.id) === String(socket.userId)) continue;
+          const memberSocketId = await resolveSocket(member.id, 'BACKGROUND', userSockets);
+          if (memberSocketId) {
+            io.to(memberSocketId).emit(SOCKET_EVENTS.GROUP_CALL_STARTED, {
+              callId,
+              groupId,
+              callType,
+              initiator: socket.userId,
+              participants: [socket.userId],
+              offer
+            });
+          }
+        }
+
+        const senderInfo = await get('SELECT username FROM users WHERE id = $1', [socket.userId]);
+        socket.emit(SOCKET_EVENTS.GROUP_CALL_PARTICIPANTS, {
+          callId,
+          participants: [socket.userId],
+          callType
+        });
+
+        logAudit(socket.userId, 'group_call_started', null, `Group call started: ${callId} type=${callType}`);
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_START error:', err);
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.GROUP_CALL_JOIN, async (data) => {
+      try {
+        const { callId, sdp } = data || {};
+        if (!callId || !socket.userId) return;
+
+        const state = getGroupCallState(callId);
+        if (!state || !state.active) return;
+
+        if (!state.participants.includes(String(socket.userId))) {
+          state.participants.push(String(socket.userId));
+        }
+        setGroupCallState(callId, state);
+
+        for (const pid of state.participants) {
+          const participantSocketId = await resolveSocket(pid, 'UI', userSockets);
+          if (participantSocketId) {
+            io.to(participantSocketId).emit(SOCKET_EVENTS.GROUP_CALL_JOINED, {
+              callId,
+              userId: socket.userId,
+              participants: state.participants,
+              sdp: String(pid) === String(socket.userId) ? undefined : sdp
+            });
+          }
+        }
+
+        logAudit(socket.userId, 'group_call_joined', null, `Joined group call: ${callId}`);
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_JOIN error:', err);
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.GROUP_CALL_LEAVE, async (data) => {
+      try {
+        const { callId } = data || {};
+        if (!callId || !socket.userId) return;
+
+        const state = getGroupCallState(callId);
+        if (state) {
+          state.participants = state.participants.filter(p => p !== String(socket.userId));
+          if (state.participants.length === 0) {
+            state.active = false;
+            removeGroupCallState(callId);
+          } else {
+            setGroupCallState(callId, state);
+          }
+        }
+
+        for (const pid of (state?.participants || [])) {
+          const participantSocketId = await resolveSocket(pid, 'UI', userSockets);
+          if (participantSocketId) {
+            io.to(participantSocketId).emit(SOCKET_EVENTS.GROUP_CALL_LEFT, {
+              callId,
+              userId: socket.userId,
+              participants: state?.participants || []
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_LEAVE error:', err);
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.GROUP_CALL_OFFER, async (data) => {
+      try {
+        const { callId, to, offer } = data || {};
+        if (!callId || !to || !offer || !socket.userId) return;
+
+        const targetSocketId = await resolveSocket(to, 'UI', userSockets);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit(SOCKET_EVENTS.GROUP_CALL_OFFER, {
+            callId,
+            from: socket.userId,
+            offer
+          });
+        }
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_OFFER error:', err);
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.GROUP_CALL_ANSWER, async (data) => {
+      try {
+        const { callId, to, answer } = data || {};
+        if (!callId || !to || !answer || !socket.userId) return;
+
+        const targetSocketId = await resolveSocket(to, 'UI', userSockets);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit(SOCKET_EVENTS.GROUP_CALL_ANSWER, {
+            callId,
+            from: socket.userId,
+            answer
+          });
+        }
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_ANSWER error:', err);
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.GROUP_CALL_ICE_CANDIDATE, async (data) => {
+      try {
+        const { callId, to, candidate } = data || {};
+        if (!callId || !to || !candidate || !socket.userId) return;
+
+        const targetSocketId = await resolveSocket(to, 'UI', userSockets);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit(SOCKET_EVENTS.GROUP_CALL_ICE_CANDIDATE, {
+            callId,
+            from: socket.userId,
+            candidate
+          });
+        }
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_ICE_CANDIDATE error:', err);
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.GROUP_CALL_END, async (data) => {
+      try {
+        const { callId } = data || {};
+        if (!callId || !socket.userId) return;
+
+        const state = getGroupCallState(callId);
+        if (state) {
+          state.active = false;
+          const callDuration = Math.floor((Date.now() - state.startTime) / 1000);
+          for (const pid of state.participants) {
+            const participantSocketId = await resolveSocket(pid, 'UI', userSockets);
+            if (participantSocketId) {
+              io.to(participantSocketId).emit(SOCKET_EVENTS.GROUP_CALL_ENDED, {
+                callId,
+                endedBy: socket.userId,
+                duration: callDuration
+              });
+            }
+          }
+          removeGroupCallState(callId);
+
+          try {
+            const { addGroupCallHistory } = await import('../services/callHistoryService.js');
+            await addGroupCallHistory({
+              groupId: state.groupId,
+              initiatorId: state.initiator,
+              callType: state.callType,
+              duration: callDuration,
+              participants: state.participants
+            });
+          } catch (histErr) {
+            console.error('[CALL_SOCKET] Group call history save error:', histErr);
+          }
+
+          logAudit(socket.userId, 'group_call_ended', null, `Group call ended: ${callId} duration=${callDuration}s`);
+        }
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_END error:', err);
+      }
+    });
+
+    // Group call timeout handling
+    socket.on(SOCKET_EVENTS.GROUP_CALL_REJECT, async (data) => {
+      try {
+        const { callId } = data || {};
+        if (!callId || !socket.userId) return;
+
+        const state = getGroupCallState(callId);
+        if (state) {
+          const rejectMsg = { callId, userId: socket.userId, reason: 'rejected' };
+          for (const pid of state.participants) {
+            const participantSocketId = await resolveSocket(pid, 'UI', userSockets);
+            if (participantSocketId) {
+              io.to(participantSocketId).emit(SOCKET_EVENTS.GROUP_CALL_REJECTED, rejectMsg);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[CALL_SOCKET] GROUP_CALL_REJECT error:', err);
+      }
+    });
+
+    // Auto-cleanup stale group calls on disconnect
+    const cleanupStaleGroupCalls = async () => {
+      const now = Date.now();
+      for (const [callId, state] of groupCalls.entries()) {
+        if (state.active && (now - state.startTime) > CALL_TIMEOUT_MS) {
+          state.active = false;
+          for (const pid of state.participants) {
+            const participantSocketId = await resolveSocket(pid, 'UI', userSockets);
+            if (participantSocketId) {
+              io.to(participantSocketId).emit(SOCKET_EVENTS.GROUP_CALL_TIMEOUT, { callId });
+            }
+          }
+          removeGroupCallState(callId);
+          console.log('[CALL_SOCKET] Group call timed out:', callId);
+        }
+      }
+    };
+
+    const groupCallCleanupInterval = setInterval(cleanupStaleGroupCalls, 30000);
 
     // Phase 59: Connectivity Additive Events
     socket.on('ice-retry-requested', (data) => {

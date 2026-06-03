@@ -1,0 +1,122 @@
+name: ZYMI Beta CI
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+on:
+  push:
+    branches:
+      - 'beta/**'
+  pull_request:
+    branches:
+      - 'beta/**'
+  workflow_dispatch:
+
+jobs:
+  backend-check:
+    name: Backend Syntax & Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./server
+
+      - name: Syntax check
+        run: |
+          find src -name '*.js' -exec node --check {} \;
+          node --check index.js
+        working-directory: ./server
+
+  client-build:
+    name: Client Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./client
+
+      - name: Build client
+        run: npm run build
+        working-directory: ./client
+        env:
+          VITE_API_URL: https://api.beta.zymi.app
+          VITE_SOCKET_URL: https://api.beta.zymi.app
+
+  docker-validate:
+    name: Docker Compose Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose config
+        run: docker compose -f docker-compose.prod.yml config
+
+  flutter-analyze:
+    name: Flutter Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.x'
+
+      - name: Flutter pub get
+        run: flutter pub get
+        working-directory: ./mobile/zymi_mobile_app
+
+      - name: Flutter analyze
+        run: flutter analyze
+        working-directory: ./mobile/zymi_mobile_app
+
+  deploy-staging:
+    name: Deploy to Staging (Manual Approval)
+    needs: [backend-check, client-build, docker-validate, flutter-analyze]
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.zymi.yourdomain.com
+    if: github.ref == 'refs/heads/beta/v1.0.0'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          script: |
+            cd /opt/zymi
+            git pull origin beta/v1.0.0
+            cp .env.production .env
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            docker compose -f docker-compose.prod.yml ps
+            echo "Deployment complete"

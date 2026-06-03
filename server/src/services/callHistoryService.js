@@ -164,6 +164,57 @@ export const getCallHistory = async (userId, limit = 50) => {
   `, [userId, userId, limit]);
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// Group Call History (Phase 5B)
+// ═══════════════════════════════════════════════════════════════════
+
+export const createGroupCallHistoryTable = async () => {
+  if (!(await tableExists('group_call_history'))) {
+    await exec(`
+      CREATE TABLE IF NOT EXISTS group_call_history (
+        id SERIAL PRIMARY KEY,
+        group_id INTEGER NOT NULL,
+        initiator_id INTEGER NOT NULL REFERENCES users(id),
+        call_type TEXT NOT NULL,
+        duration INTEGER DEFAULT 0,
+        participant_count INTEGER DEFAULT 0,
+        participant_ids TEXT,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[MIGRATION] Created group_call_history table');
+  }
+};
+
+export const addGroupCallHistory = async ({ groupId, initiatorId, callType, duration, participants }) => {
+  try {
+    await run(
+      `INSERT INTO group_call_history (group_id, initiator_id, call_type, duration, participant_count, participant_ids)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [groupId, initiatorId, callType || 'audio', duration || 0, participants?.length || 0, participants ? JSON.stringify(participants) : null]
+    );
+  } catch (err) {
+    console.error('[CALL_HISTORY] Error saving group call history:', err.message);
+  }
+};
+
+export const getGroupCallHistory = async (groupId, limit = 50) => {
+  try {
+    return await all(`
+      SELECT gch.*, u.username as initiator_username
+      FROM group_call_history gch
+      JOIN users u ON gch.initiator_id = u.id
+      WHERE gch.group_id = $1
+      ORDER BY gch.started_at DESC
+      LIMIT $2
+    `, [groupId, limit]);
+  } catch (err) {
+    console.error('[CALL_HISTORY] Error fetching group call history:', err.message);
+    return [];
+  }
+};
+
 // Get current call for a specific caller (used by callSocket handlers)
 export const getCurrentCall = (callerId) => {
   if (callerId) {
