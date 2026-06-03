@@ -102,7 +102,7 @@ jobs:
         run: flutter analyze
 
       - name: Build APK (Debug)
-        run: flutter build apk --debug --android-skip-build-dependency-validation
+        run: flutter build apk --debug --android-skip-build-dependency-validation --dart-define=API_URL=${{ vars.API_URL || 'http://localhost:5001' }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

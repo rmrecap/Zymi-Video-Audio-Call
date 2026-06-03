@@ -1,0 +1,46 @@
+# ZYMI Server — Render Blueprint Deployment
+#
+# 1. Push this repo to GitHub
+# 2. In Render Dashboard → Blueprint → Connect repo
+# 3. Set the DATABASE_URL env var to your Supabase PostgreSQL connection string
+#    (see server/.env.production for instructions)
+# 4. Deploy
+
+services:
+  - type: web
+    name: zymi-server
+    env: node
+    region: oregon
+    plan: free
+    rootDir: server
+    buildCommand: npm ci --only=production
+    startCommand: node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "5000"
+      # REQUIRED: Set this to your Supabase PostgreSQL connection string
+      # Format: postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # Set to your web app URL (e.g. https://zymi-app.onrender.com or http://localhost:5175 for dev)
+      - key: CLIENT_ORIGIN
+        value: "*"
+      - key: SUPER_ADMIN_USERNAME
+        value: admin
+      - key: SUPER_ADMIN_PASSWORD
+        generateValue: true
+      - key: SELF_HOSTED_PHONE_OTP_DISPLAY
+        value: "true"
+      # Pool max — cap at 10 for Supabase free tier (15 conn limit)
+      - key: DATABASE_POOL_MAX
+        value: "10"
+      # Redis is optional on free tier — Socket.IO will work without it
+      - key: REDIS_URL
+        value: ""

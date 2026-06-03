@@ -22,12 +22,14 @@ export const initPostgres = () => {
     return null;
   }
 
-  // Calculate pool size based on available CPU cores and PM2 cluster size
+  // Calculate pool size based on available CPU cores and PM2 cluster size,
+  // capped to avoid exhausting Supabase free tier (max 15 connections).
   const cpuCount = os.cpus().length;
-  const globalMaxConnections = 250; // Set in postgresql.conf
+  const globalMaxConnections = 250;
   const instances = parseInt(process.env.NODE_APP_INSTANCE_COUNT || cpuCount.toString(), 10);
   const safePoolSize = Math.floor(globalMaxConnections / instances) - 5;
-  const maxPoolSize = safePoolSize > 10 ? safePoolSize : 20;
+  const calculatedSize = safePoolSize > 10 ? safePoolSize : 20;
+  const maxPoolSize = Math.min(calculatedSize, parseInt(process.env.DATABASE_POOL_MAX || '10', 10));
 
   console.log(`[POSTGRES] Calculating pool size. CPUs: ${cpuCount}, Instances: ${instances}, Safe Pool Size: ${safePoolSize}, Using max pool size: ${maxPoolSize}`);
 
