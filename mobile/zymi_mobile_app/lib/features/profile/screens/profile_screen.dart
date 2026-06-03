@@ -296,20 +296,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildActionButtons() {
-    final role = _profile?['role'] ?? 'user';
     return Column(
       children: [
-        if (role == 'admin' || role == 'super_admin')
-          ListTile(
-            onTap: () => Navigator.pushNamed(context, ZymiRoutes.adminPanel),
-            leading: const Icon(Icons.shield, color: Colors.amberAccent),
-            title: const Text('Admin Panel', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
-            trailing: const Icon(Icons.chevron_right, color: Colors.amberAccent),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            tileColor: Colors.amberAccent.withValues(alpha: 0.05),
-          ),
-        if (role == 'admin' || role == 'super_admin')
-          const SizedBox(height: 8),
         ListTile(
           onTap: () {},
           leading: const Icon(Icons.settings_outlined, color: Colors.white70),

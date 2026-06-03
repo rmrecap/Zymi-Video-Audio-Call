@@ -60,34 +60,51 @@ export const requireAuth = async (req, res, next) => {
   }
 };
 
+/**
+ * Strict admin route guard. Every request to /api/admin/* passes through this.
+ * - Verifies JWT from Authorization header.
+ * - Validates user exists, is not banned, and has role === 'admin' || 'super_admin'.
+ * - Logs every rejection as a CRITICAL security anomaly.
+ * - Returns 403 Forbidden with no additional hints on failure.
+ */
 export const requireAdmin = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    console.warn('[SECURITY_ANOMALY] Admin route accessed without Authorization header');
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   const token = authHeader.substring(7);
   const decoded = verifyToken(token);
 
   if (!decoded) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.warn('[SECURITY_ANOMALY] Admin route accessed with invalid/expired token');
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   const userId = decoded.userId;
   try {
     const user = await db.get('SELECT id, username, role, is_banned, token_version FROM users WHERE id = $1', userId);
 
-    if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
-      return res.status(403).json({ error: 'Admin access required' });
+    if (!user) {
+      console.warn(`[SECURITY_ANOMALY] Admin route accessed by non-existent user ID=${userId}`);
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (user.role !== 'admin' && user.role !== 'super_admin') {
+      console.warn(`[SECURITY_ANOMALY] Non-admin user ${user.username} (ID=${userId}, role=${user.role}) attempted admin route: ${req.method} ${req.originalUrl}`);
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     if (user.is_banned) {
-      return res.status(403).json({ error: 'Account suspended' });
+      console.warn(`[SECURITY_ANOMALY] Banned user ${user.username} (ID=${userId}) attempted admin route: ${req.method} ${req.originalUrl}`);
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     if (decoded.tokenVersion !== user.token_version) {
-      return res.status(401).json({ error: 'Session invalidated (password changed)' });
+      console.warn(`[SECURITY_ANOMALY] Stale session for admin ${user.username} (ID=${userId})`);
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     req.adminUser = {
@@ -97,8 +114,8 @@ export const requireAdmin = async (req, res, next) => {
     };
     next();
   } catch (err) {
-    console.error('[ADMIN_MIDDLEWARE] Error:', err);
-    res.status(500).json({ error: 'Internal server error during admin validation' });
+    console.error('[ADMIN_MIDDLEWARE] Internal error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
