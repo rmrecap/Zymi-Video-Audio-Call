@@ -1,0 +1,236 @@
+name: ZYMI Build All Platforms
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: 'Build Android APK (debug)'
+        type: boolean
+        default: true
+      build_linux:
+        description: 'Build Linux Desktop (AppImage)'
+        type: boolean
+        default: true
+      build_windows:
+        description: 'Build Windows Desktop (EXE)'
+        type: boolean
+        default: false
+      build_web:
+        description: 'Build Flutter Web'
+        type: boolean
+        default: true
+  push:
+    branches:
+      - 'beta/**'
+      - main
+
+jobs:
+  android-apk:
+    name: Android APK (Debug)
+    if: ${{ github.event_name == 'push' || inputs.build_android }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile/zymi_mobile_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.x'
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze
+
+      - name: Build APK (Debug)
+        run: flutter build apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: zymi-android-debug-apk
+          path: mobile/zymi_mobile_app/build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+  linux-desktop:
+    name: Linux Desktop
+    if: ${{ github.event_name == 'push' || inputs.build_linux }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile/zymi_mobile_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.x'
+          cache: true
+
+      - name: Enable Linux Desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Linux
+        run: flutter build linux --release
+
+      - name: Upload Linux Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: zymi-linux-desktop
+          path: mobile/zymi_mobile_app/build/linux/x64/release/bundle/
+          retention-days: 30
+          if-no-files-found: error
+
+  windows-desktop:
+    name: Windows Desktop
+    if: ${{ inputs.build_windows }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ./mobile/zymi_mobile_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.x'
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Windows
+        run: flutter build windows --release
+
+      - name: Upload Windows Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: zymi-windows-desktop
+          path: mobile/zymi_mobile_app/build/windows/x64/runner/Release/
+          retention-days: 30
+          if-no-files-found: error
+
+  flutter-web:
+    name: Flutter Web
+    if: ${{ github.event_name == 'push' || inputs.build_web }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile/zymi_mobile_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.x'
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Flutter Web
+        run: flutter build web --release
+
+      - name: Upload Web Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: zymi-flutter-web
+          path: mobile/zymi_mobile_app/build/web/
+          retention-days: 30
+          if-no-files-found: error
+
+  client-vite:
+    name: Web Client (Vite/React)
+    if: ${{ github.event_name == 'push' || inputs.build_web }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build client
+        run: npm run build
+
+      - name: Upload Client Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: zymi-web-client
+          path: client/dist/
+          retention-days: 30
+          if-no-files-found: error
+
+  server-check:
+    name: Server Syntax Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check all JS files
+        run: |
+          find src -name '*.js' -exec node --check {} \;
+          node --check index.js

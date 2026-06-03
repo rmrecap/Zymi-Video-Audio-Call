@@ -72,35 +72,52 @@ jobs:
       - name: Validate docker-compose config
         run: docker compose -f docker-compose.prod.yml config
 
-  flutter-analyze:
-    name: Flutter Analyze
+  flutter-build:
+    name: Flutter Build APK
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile/zymi_mobile_app
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           flutter-version: '3.x'
+          cache: true
 
       - name: Flutter pub get
         run: flutter pub get
-        working-directory: ./mobile/zymi_mobile_app
 
       - name: Flutter analyze
         run: flutter analyze
-        working-directory: ./mobile/zymi_mobile_app
+
+      - name: Build APK (Debug)
+        run: flutter build apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: zymi-beta-apk
+          path: mobile/zymi_mobile_app/build/app/outputs/flutter-apk/*.apk
+          retention-days: 7
 
   deploy-staging:
     name: Deploy to Staging (Manual Approval)
-    needs: [backend-check, client-build, docker-validate, flutter-analyze]
+    needs: [backend-check, client-build, docker-validate, flutter-build]
     runs-on: ubuntu-latest
     environment:
       name: staging
-      url: https://staging.zymi.yourdomain.com
-    if: github.ref == 'refs/heads/beta/v1.0.0'
+    if: ${{ github.ref == 'refs/heads/beta/v1.0.0' && secrets.DEPLOY_HOST != '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
