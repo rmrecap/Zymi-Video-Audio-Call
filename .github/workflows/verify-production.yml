@@ -30,293 +30,281 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || '22' }}
           script: |
             set -e
-            REPORT="/tmp/zymi_verify_$(date +%Y%m%d_%H%M%S).txt"
-
             sanitize() {
               sed -E \
                 -e 's/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/<MASKED-IP>/g' \
-                -e 's/(https?:\/\/)?[a-zA-Z0-9.-]*\.(com|app|io|net|org|dev)(\/[^\s"]*)?/ <MASKED-DOMAIN> /g' \
+                -e 's/[a-zA-Z0-9.-]+\.(com|app|io|net|org|dev)(\/[^\s"]*)?/ <MASKED-DOMAIN> /g' \
                 -e 's/(password|secret|token|jwt|key|passwd|credential)[=:]["'"'"']?[^"'"'"'\s&|;]+/\1=<MASKED>/gi' \
                 -e 's/(PASSWORD|SECRET|TOKEN|JWT|KEY)[=:]["'"'"']?[^"'"'"'\s&|;]+/\1=<MASKED>/g' \
                 -e 's/(--requirepass)\s+\S+/\1 <MASKED>/g' \
                 -e 's/(requirepass)\s+\S+/\1 <MASKED>/g'
             }
 
-            echo "========================================" >> "$REPORT"
-            echo "ZYMI PRODUCTION VERIFICATION REPORT" >> "$REPORT"
-            echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$REPORT"
-            echo "========================================" >> "$REPORT"
+            echo "========================================"
+            echo "ZYMI PRODUCTION VERIFICATION REPORT"
+            echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "========================================"
 
             # 1. System Info
-            echo "" >> "$REPORT"
-            echo "=== 1. SYSTEM INFO ===" >> "$REPORT"
-            echo "--- uptime ---" >> "$REPORT"
-            uptime | sanitize >> "$REPORT"
-            echo "--- uname -a ---" >> "$REPORT"
-            uname -a | sanitize >> "$REPORT"
-            echo "--- CPU ---" >> "$REPORT"
-            nproc >> "$REPORT"
-            lscpu | grep -E "Model name|CPU\(s\)|Thread|Core|Socket" | sanitize >> "$REPORT"
-            echo "--- Memory ---" >> "$REPORT"
-            free -h | sanitize >> "$REPORT"
-            echo "--- Disk ---" >> "$REPORT"
-            df -h | sanitize >> "$REPORT"
+            echo ""
+            echo "=== 1. SYSTEM INFO ==="
+            echo "--- uptime ---"
+            uptime | sanitize
+            echo "--- uname -a ---"
+            uname -a | sanitize
+            echo "--- CPU ---"
+            nproc
+            lscpu | grep -E "Model name|CPU\(s\)|Thread|Core|Socket" | sanitize
+            echo "--- Memory ---"
+            free -h | sanitize
+            echo "--- Disk ---"
+            df -h | sanitize
 
             # 2. Docker Runtime
-            echo "" >> "$REPORT"
-            echo "=== 2. DOCKER RUNTIME ===" >> "$REPORT"
-            echo "--- docker version ---" >> "$REPORT"
-            docker version --format '{{.Server.Version}}' | sanitize >> "$REPORT"
-            echo "--- docker compose ps ---" >> "$REPORT"
-            docker compose -f /opt/zymi/docker-compose.prod.yml ps 2>&1 | sanitize >> "$REPORT"
-            echo "--- docker stats (no-stream) ---" >> "$REPORT"
-            docker stats --no-stream 2>&1 | sanitize >> "$REPORT"
-            echo "--- docker image ls ---" >> "$REPORT"
-            docker image ls --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}' 2>&1 | sanitize >> "$REPORT"
-            echo "--- docker system df ---" >> "$REPORT"
-            docker system df 2>&1 | sanitize >> "$REPORT"
+            echo ""
+            echo "=== 2. DOCKER RUNTIME ==="
+            echo "--- docker version ---"
+            docker version --format '{{.Server.Version}}' | sanitize
+            echo "--- docker compose ps ---"
+            docker compose -f /opt/zymi/docker-compose.prod.yml ps 2>&1 | sanitize
+            echo "--- docker stats (no-stream) ---"
+            docker stats --no-stream 2>&1 | sanitize
+            echo "--- docker image ls ---"
+            docker image ls --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}' 2>&1 | sanitize
+            echo "--- docker system df ---"
+            docker system df 2>&1 | sanitize
 
             # 3. Docker Container Health
-            echo "" >> "$REPORT"
-            echo "=== 3. CONTAINER HEALTH ===" >> "$REPORT"
+            echo ""
+            echo "=== 3. CONTAINER HEALTH ==="
             for container in $(docker ps --format '{{.Names}}'); do
-              echo "--- Health: $container ---" >> "$REPORT"
-              docker inspect "$container" --format='{{.State.Status}} {{.State.Health.Status}} {{.State.Running}}' 2>&1 | sanitize >> "$REPORT"
+              echo "--- Health: $container ---"
+              docker inspect "$container" --format='{{.State.Status}} {{.State.Health.Status}} {{.State.Running}}' 2>&1 | sanitize
             done
 
             # 4. PostgreSQL
-            echo "" >> "$REPORT"
-            echo "=== 4. POSTGRESQL ===" >> "$REPORT"
+            echo ""
+            echo "=== 4. POSTGRESQL ==="
             POSTGRES_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i postgres | head -1)
             if [ -n "$POSTGRES_CONTAINER" ]; then
-              echo "--- version ---" >> "$REPORT"
-              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT version();" 2>&1 | sanitize >> "$REPORT"
-              echo "--- table count ---" >> "$REPORT"
-              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" 2>&1 | sanitize >> "$REPORT"
-              echo "--- database size ---" >> "$REPORT"
-              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT pg_database_size('zymi_db')/1024/1024 AS size_mb;" 2>&1 | sanitize >> "$REPORT"
-              echo "--- connection count ---" >> "$REPORT"
-              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT count(*) FROM pg_stat_activity;" 2>&1 | sanitize >> "$REPORT"
-              echo "--- replication ---" >> "$REPORT"
-              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT application_name, state, sync_state FROM pg_stat_replication;" 2>&1 | sanitize >> "$REPORT"
+              echo "--- version ---"
+              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT version();" 2>&1 | sanitize
+              echo "--- table count ---"
+              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" 2>&1 | sanitize
+              echo "--- database size ---"
+              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT pg_database_size('zymi_db')/1024/1024 AS size_mb;" 2>&1 | sanitize
+              echo "--- connection count ---"
+              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT count(*) FROM pg_stat_activity;" 2>&1 | sanitize
+              echo "--- replication ---"
+              docker exec "$POSTGRES_CONTAINER" psql -U zymi_user -d zymi_db -c "SELECT application_name, state, sync_state FROM pg_stat_replication;" 2>&1 | sanitize
             else
-              echo "PostgreSQL container not found" >> "$REPORT"
+              echo "PostgreSQL container not found"
             fi
 
             # 5. Redis
-            echo "" >> "$REPORT"
-            echo "=== 5. REDIS ===" >> "$REPORT"
+            echo ""
+            echo "=== 5. REDIS ==="
             REDIS_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i redis | head -1)
             if [ -n "$REDIS_CONTAINER" ]; then
-              echo "--- ping ---" >> "$REPORT"
-              docker exec "$REDIS_CONTAINER" redis-cli ping 2>&1 | sanitize >> "$REPORT"
-              echo "--- info memory ---" >> "$REPORT"
-              docker exec "$REDIS_CONTAINER" redis-cli info memory 2>&1 | grep -E "used_memory_human|used_memory_rss_human|maxmemory_human" | sanitize >> "$REPORT"
-              echo "--- info stats ---" >> "$REPORT"
-              docker exec "$REDIS_CONTAINER" redis-cli info stats 2>&1 | grep -E "total_connections_received|total_commands_processed|expired_keys|evicted_keys" | sanitize >> "$REPORT"
-              echo "--- info replication ---" >> "$REPORT"
-              docker exec "$REDIS_CONTAINER" redis-cli info replication 2>&1 | grep -v "^#" | sanitize >> "$REPORT"
+              echo "--- ping ---"
+              docker exec "$REDIS_CONTAINER" redis-cli ping 2>&1 | sanitize
+              echo "--- info memory ---"
+              docker exec "$REDIS_CONTAINER" redis-cli info memory 2>&1 | grep -E "used_memory_human|used_memory_rss_human|maxmemory_human" | sanitize
+              echo "--- info stats ---"
+              docker exec "$REDIS_CONTAINER" redis-cli info stats 2>&1 | grep -E "total_connections_received|total_commands_processed|expired_keys|evicted_keys" | sanitize
+              echo "--- info replication ---"
+              docker exec "$REDIS_CONTAINER" redis-cli info replication 2>&1 | grep -v "^#" | sanitize
             else
-              echo "Redis container not found" >> "$REPORT"
+              echo "Redis container not found"
             fi
 
             # 6. Nginx Health
-            echo "" >> "$REPORT"
-            echo "=== 6. NGINX ===" >> "$REPORT"
+            echo ""
+            echo "=== 6. NGINX ==="
             NGINX_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i nginx | head -1)
             if [ -n "$NGINX_CONTAINER" ]; then
-              echo "--- nginx -T (syntax) ---" >> "$REPORT"
-              docker exec "$NGINX_CONTAINER" nginx -T 2>&1 | head -20 | sanitize >> "$REPORT"
-              echo "--- nginx processes ---" >> "$REPORT"
-              docker exec "$NGINX_CONTAINER" ps aux | grep nginx | sanitize >> "$REPORT"
+              echo "--- nginx -T (syntax) ---"
+              docker exec "$NGINX_CONTAINER" nginx -T 2>&1 | head -20 | sanitize
+              echo "--- nginx processes ---"
+              docker exec "$NGINX_CONTAINER" ps aux | grep nginx | sanitize
             else
-              echo "Nginx container not found" >> "$REPORT"
+              echo "Nginx container not found"
             fi
 
             # 7. SSL Certificate
-            echo "" >> "$REPORT"
-            echo "=== 7. SSL CERTIFICATE ===" >> "$REPORT"
+            echo ""
+            echo "=== 7. SSL CERTIFICATE ==="
             CERT_PATH=$(find /etc/letsencrypt/live -name fullchain.pem 2>/dev/null | head -1)
             if [ -n "$CERT_PATH" ]; then
-              echo "--- cert path ---" >> "$REPORT"
-              echo "$CERT_PATH" | sanitize >> "$REPORT"
-              echo "--- issuer ---" >> "$REPORT"
-              openssl x509 -in "$CERT_PATH" -noout -issuer 2>&1 | sanitize >> "$REPORT"
-              echo "--- subject ---" >> "$REPORT"
-              openssl x509 -in "$CERT_PATH" -noout -subject 2>&1 | sanitize >> "$REPORT"
-              echo "--- validity ---" >> "$REPORT"
-              openssl x509 -in "$CERT_PATH" -noout -dates 2>&1 | sanitize >> "$REPORT"
-              echo "--- days until expiry ---" >> "$REPORT"
-              openssl x509 -in "$CERT_PATH" -noout -enddate 2>&1 | cut -d= -f2 | xargs -I{} sh -c 'echo "$(( ($(date -d "{}" +%s) - $(date +%s)) / 86400 )) days"' | sanitize >> "$REPORT"
+              echo "--- cert path ---"
+              echo "$CERT_PATH" | sanitize
+              echo "--- issuer ---"
+              openssl x509 -in "$CERT_PATH" -noout -issuer 2>&1 | sanitize
+              echo "--- subject ---"
+              openssl x509 -in "$CERT_PATH" -noout -subject 2>&1 | sanitize
+              echo "--- validity ---"
+              openssl x509 -in "$CERT_PATH" -noout -dates 2>&1 | sanitize
+              echo "--- days until expiry ---"
+              openssl x509 -in "$CERT_PATH" -noout -enddate 2>&1 | cut -d= -f2 | xargs -I{} sh -c 'echo "$(( ($(date -d "{}" +%s) - $(date +%s)) / 86400 )) days"' | sanitize
             else
-              echo "No Let's Encrypt certificates found" >> "$REPORT"
+              echo "No Let's Encrypt certificates found"
             fi
 
             # 8. HAProxy / Load Balancer
-            echo "" >> "$REPORT"
-            echo "=== 8. LOAD BALANCER ===" >> "$REPORT"
+            echo ""
+            echo "=== 8. LOAD BALANCER ==="
             HAPROXY_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i haproxy | head -1)
             if [ -n "$HAPROXY_CONTAINER" ]; then
-              echo "--- haproxy status ---" >> "$REPORT"
-              docker exec "$HAPROXY_CONTAINER" haproxy -vv 2>&1 | head -3 | sanitize >> "$REPORT"
-              echo "--- haproxy processes ---" >> "$REPORT"
-              docker exec "$HAPROXY_CONTAINER" ps aux 2>&1 | head -10 | sanitize >> "$REPORT"
+              echo "--- haproxy status ---"
+              docker exec "$HAPROXY_CONTAINER" haproxy -vv 2>&1 | head -3 | sanitize
+              echo "--- haproxy processes ---"
+              docker exec "$HAPROXY_CONTAINER" ps aux 2>&1 | head -10 | sanitize
             else
-              echo "HAProxy container not found or not running" >> "$REPORT"
+              echo "HAProxy container not found or not running"
             fi
 
             # 9. Coturn
-            echo "" >> "$REPORT"
-            echo "=== 9. COTURN ===" >> "$REPORT"
+            echo ""
+            echo "=== 9. COTURN ==="
             COTURN_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i coturn | head -1)
             if [ -n "$COTURN_CONTAINER" ]; then
-              echo "--- coturn version ---" >> "$REPORT"
-              docker exec "$COTURN_CONTAINER" turnserver --version 2>&1 | head -3 | sanitize >> "$REPORT"
-              echo "--- coturn listening ---" >> "$REPORT"
-              docker exec "$COTURN_CONTAINER" ss -tulpn 2>&1 | grep -E "3478|5349" | sanitize >> "$REPORT"
-              echo "--- coturn processes ---" >> "$REPORT"
-              docker exec "$COTURN_CONTAINER" ps aux 2>&1 | head -5 | sanitize >> "$REPORT"
+              echo "--- coturn version ---"
+              docker exec "$COTURN_CONTAINER" turnserver --version 2>&1 | head -3 | sanitize
+              echo "--- coturn listening ---"
+              docker exec "$COTURN_CONTAINER" ss -tulpn 2>&1 | grep -E "3478|5349" | sanitize
+              echo "--- coturn processes ---"
+              docker exec "$COTURN_CONTAINER" ps aux 2>&1 | head -5 | sanitize
             else
-              echo "Coturn container not found" >> "$REPORT"
+              echo "Coturn container not found"
             fi
 
             # 10. Prometheus
-            echo "" >> "$REPORT"
-            echo "=== 10. PROMETHEUS ===" >> "$REPORT"
+            echo ""
+            echo "=== 10. PROMETHEUS ==="
             PROMETHEUS_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i prometheus | head -1)
             if [ -n "$PROMETHEUS_CONTAINER" ]; then
-              echo "--- prometheus targets ---" >> "$REPORT"
-              docker exec "$PROMETHEUS_CONTAINER" wget -qO- http://localhost:9090/api/v1/targets 2>&1 | python3 -m json.tool 2>/dev/null | head -50 | sanitize >> "$REPORT"
+              echo "--- prometheus targets ---"
+              docker exec "$PROMETHEUS_CONTAINER" wget -qO- http://localhost:9090/api/v1/targets 2>&1 | python3 -m json.tool 2>/dev/null | head -50 | sanitize
             else
-              echo "Prometheus container not found" >> "$REPORT"
+              echo "Prometheus container not found"
             fi
 
             # 11. Grafana
-            echo "" >> "$REPORT"
-            echo "=== 11. GRAFANA ===" >> "$REPORT"
+            echo ""
+            echo "=== 11. GRAFANA ==="
             GRAFANA_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i grafana | head -1)
             if [ -n "$GRAFANA_CONTAINER" ]; then
-              echo "--- grafana health ---" >> "$REPORT"
-              docker exec "$GRAFANA_CONTAINER" wget -qO- http://localhost:3000/api/health 2>&1 | sanitize >> "$REPORT"
+              echo "--- grafana health ---"
+              docker exec "$GRAFANA_CONTAINER" wget -qO- http://localhost:3000/api/health 2>&1 | sanitize
             else
-              echo "Grafana container not found" >> "$REPORT"
+              echo "Grafana container not found"
             fi
 
             # 12. Node Exporter
-            echo "" >> "$REPORT"
-            echo "=== 12. NODE EXPORTER ===" >> "$REPORT"
+            echo ""
+            echo "=== 12. NODE EXPORTER ==="
             NODE_EXPORTER_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i node-exporter | head -1)
             if [ -n "$NODE_EXPORTER_CONTAINER" ]; then
-              echo "--- node exporter up ---" >> "$REPORT"
-              echo "Container running: yes" >> "$REPORT"
+              echo "--- node exporter up ---"
+              echo "Container running: yes"
             else
-              echo "Node Exporter container not found" >> "$REPORT"
+              echo "Node Exporter container not found"
             fi
 
             # 13. cAdvisor
-            echo "" >> "$REPORT"
-            echo "=== 13. CADVISOR ===" >> "$REPORT"
+            echo ""
+            echo "=== 13. CADVISOR ==="
             CADVISOR_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i cadvisor | head -1)
             if [ -n "$CADVISOR_CONTAINER" ]; then
-              echo "--- cadvisor up ---" >> "$REPORT"
-              echo "Container running: yes" >> "$REPORT"
+              echo "--- cadvisor up ---"
+              echo "Container running: yes"
             else
-              echo "cAdvisor container not found" >> "$REPORT"
+              echo "cAdvisor container not found"
             fi
 
             # 14. Backup Verification
-            echo "" >> "$REPORT"
-            echo "=== 14. BACKUP ===" >> "$REPORT"
+            echo ""
+            echo "=== 14. BACKUP ==="
             BACKUP_DIR="/opt/zymi/backups"
             if [ -d "$BACKUP_DIR" ]; then
-              echo "--- latest backups ---" >> "$REPORT"
-              ls -lh "$BACKUP_DIR" 2>&1 | tail -20 | sanitize >> "$REPORT"
-              echo "--- backup count ---" >> "$REPORT"
-              echo "Total backup files: $(find $BACKUP_DIR -type f -name '*.sql' -o -name '*.dump' 2>/dev/null | wc -l)" >> "$REPORT"
-              echo "Total backup size: $(du -sh $BACKUP_DIR 2>/dev/null | cut -f1)" >> "$REPORT"
+              echo "--- latest backups ---"
+              ls -lh "$BACKUP_DIR" 2>&1 | tail -20 | sanitize
+              echo "--- backup count ---"
+              echo "Total backup files: $(find $BACKUP_DIR -type f -name '*.sql' -o -name '*.dump' 2>/dev/null | wc -l)"
+              echo "Total backup size: $(du -sh $BACKUP_DIR 2>/dev/null | cut -f1)"
             else
-              echo "Backup directory not found at $BACKUP_DIR" >> "$REPORT"
+              echo "Backup directory not found at $BACKUP_DIR"
             fi
 
             # 15. Security Check
-            echo "" >> "$REPORT"
-            echo "=== 15. SECURITY ===" >> "$REPORT"
-            echo "--- fail2ban status ---" >> "$REPORT"
+            echo ""
+            echo "=== 15. SECURITY ==="
+            echo "--- fail2ban status ---"
             if command -v fail2ban-client &>/dev/null; then
-              fail2ban-client status 2>&1 | sanitize >> "$REPORT"
+              fail2ban-client status 2>&1 | sanitize
               for jail in $(fail2ban-client status 2>&1 | grep "Jail list" | cut -d: -f2); do
-                echo "Jail: $jail" | sanitize >> "$REPORT"
-                fail2ban-client status "$jail" 2>&1 | sanitize >> "$REPORT"
+                echo "Jail: $jail" | sanitize
+                fail2ban-client status "$jail" 2>&1 | sanitize
               done
             else
-              echo "fail2ban-client not installed" >> "$REPORT"
+              echo "fail2ban-client not installed"
             fi
-            echo "--- ufw status ---" >> "$REPORT"
+            echo "--- ufw status ---"
             if command -v ufw &>/dev/null; then
-              ufw status verbose 2>&1 | sanitize >> "$REPORT"
+              ufw status verbose 2>&1 | sanitize
             else
-              echo "ufw not installed" >> "$REPORT"
+              echo "ufw not installed"
             fi
-            echo "--- last logins ---" >> "$REPORT"
-            last -10 2>&1 | sanitize >> "$REPORT"
+            echo "--- last logins ---"
+            last -10 2>&1 | sanitize
 
             # 16. Current .env secret count (no values)
-            echo "" >> "$REPORT"
-            echo "=== 16. ENV SECRET COUNT ===" >> "$REPORT"
+            echo ""
+            echo "=== 16. ENV SECRET COUNT ==="
             ENV_FILE="/opt/zymi/.env"
-            if [ -f "$ENV_FILE ]; then
-              echo "--- env vars with secrets (count only) ---" >> "$REPORT"
-              grep -cE "(PASSWORD|SECRET|KEY|TOKEN|JWT)" "$ENV_FILE" 2>/dev/null | xargs -I{} echo "Secret-like vars: {}" >> "$REPORT"
-              echo "--- total env vars ---" >> "$REPORT"
-              wc -l < "$ENV_FILE" | xargs -I{} echo "Total lines: {}" >> "$REPORT"
+            if [ -f "$ENV_FILE" ]; then
+              echo "--- env vars with secrets (count only) ---"
+              grep -cE "(PASSWORD|SECRET|KEY|TOKEN|JWT)" "$ENV_FILE" 2>/dev/null | xargs -I{} echo "Secret-like vars: {}"
+              echo "--- total env vars ---"
+              wc -l < "$ENV_FILE" | xargs -I{} echo "Total lines: {}"
             else
-              echo ".env not found at $ENV_FILE" >> "$REPORT"
+              echo ".env not found at $ENV_FILE"
             fi
 
             # 17. Check required node modules and flutter
-            echo "" >> "$REPORT"
-            echo "=== 17. VALIDATION READINESS ===" >> "$REPORT"
-            echo "--- node version ---" >> "$REPORT"
-            node --version 2>&1 | sanitize >> "$REPORT"
-            echo "--- npm version ---" >> "$REPORT"
-            npm --version 2>&1 | sanitize >> "$REPORT"
-            echo "--- flutter version ---" >> "$REPORT"
+            echo ""
+            echo "=== 17. VALIDATION READINESS ==="
+            echo "--- node version ---"
+            node --version 2>&1 | sanitize
+            echo "--- npm version ---"
+            npm --version 2>&1 | sanitize
+            echo "--- flutter version ---"
             if command -v flutter &>/dev/null; then
-              flutter --version 2>&1 | head -3 | sanitize >> "$REPORT"
+              flutter --version 2>&1 | head -3 | sanitize
             else
-              echo "flutter not installed on VPS (runs in CI)" >> "$REPORT"
+              echo "flutter not installed on VPS (runs in CI)"
             fi
 
             # 18. Health Check Endpoints
-            echo "" >> "$REPORT"
-            echo "=== 18. HEALTH ENDPOINTS ===" >> "$REPORT"
-            echo "--- backend health ---" >> "$REPORT"
-            curl -s -o /dev/null -w "HTTP %{http_code} -- %{time_total}s" http://localhost:5000/health 2>&1 | sanitize >> "$REPORT"
-            echo "" >> "$REPORT"
+            echo ""
+            echo "=== 18. HEALTH ENDPOINTS ==="
+            echo "--- backend health ---"
+            curl -s -o /dev/null -w "HTTP %{http_code} -- %{time_total}s" http://localhost:5000/health 2>&1 | sanitize
+            echo ""
 
-            echo "" >> "$REPORT"
-            echo "========================================" >> "$REPORT"
-            echo "VERIFICATION COMPLETE" >> "$REPORT"
-            echo "========================================" >> "$REPORT"
+            echo ""
+            echo "========================================"
+            echo "VERIFICATION COMPLETE"
+            echo "========================================"
 
-            echo "REPORT_PATH=$REPORT"
-
-      - name: Upload verification report
-        uses: actions/upload-artifact@v4
-        with:
-          name: zymi-production-verification
-          path: /tmp/zymi_verify_*.txt
-          retention-days: 7
-          if-no-files-found: error
-
-      - name: Summary of checks
+      - name: Save report to runner
+        shell: bash
         run: |
+          echo "Report output is in the step log above."
+          echo "Copy the full output from the 'Collect live production evidence' step."
+          echo ""
           echo "## Production Verification Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Trigger the workflow from GitHub Actions UI:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Go to 'Actions' tab" >> $GITHUB_STEP_SUMMARY
-          echo "2. Select 'ZYMI Production Verification Audit'" >> $GITHUB_STEP_SUMMARY
-          echo "3. Click 'Run workflow'" >> $GITHUB_STEP_SUMMARY
-          echo "4. Download the artifact after completion" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Artifact: zymi-production-verification (7 day retention)" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to the 'Collect live production evidence' step log above" >> $GITHUB_STEP_SUMMARY
+          echo "2. Select all output from '==== ZYMI PRODUCTION VERIFICATION REPORT ====' to '==== VERIFICATION COMPLETE ===='" >> $GITHUB_STEP_SUMMARY
+          echo "3. Copy and share it to populate PHASE 103-108 reports" >> $GITHUB_STEP_SUMMARY
