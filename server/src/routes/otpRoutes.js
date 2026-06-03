@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/authMiddleware.js';
-import { requestEmailOTP, verifyEmailOTP, requestPhoneVerificationLink, verifyPhoneOTP, verifyPhoneOTPInline, markTokenOpened, checkTokenStatus } from '../services/otpService.js';
+import { requestEmailOTP, verifyEmailOTP, requestPhoneVerificationLink, verifyPhoneOTP, verifyPhoneOTPInline, markTokenOpened, checkTokenStatus, getPendingVerifications } from '../services/otpService.js';
 import { normalizePhone } from '../utils/phoneNormalizer.js';
 import { updateProfileCompletion } from '../services/profileCompletionService.js';
 import { logAudit } from '../services/auditService.js';
@@ -159,6 +159,15 @@ router.get('/phone/verify/:token', async (req, res) => {
     `);
   } catch (err) {
     res.status(500).send('<h1>Internal Server Error</h1>');
+  }
+});
+
+router.get('/pending', requireAuth, async (req, res) => {
+  try {
+    const verifications = await getPendingVerifications(req.user.id);
+    res.json({ verifications });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch pending verifications' });
   }
 });
 

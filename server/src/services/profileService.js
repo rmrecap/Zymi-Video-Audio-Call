@@ -8,7 +8,9 @@ export const getProfile = async (userId) => {
       phone, phone_verified, email, email_verified, 
       profile_completion, verification_status, created_at,
       first_name, last_name, address, work, hobby, family_members,
-      premium_status, selected_server
+      premium_status, selected_server,
+      age, profession, education, hobbies, interests, theme,
+      country_code, city_name
     FROM users WHERE id = $1
   `, [userId]);
 
@@ -20,7 +22,7 @@ export const getProfile = async (userId) => {
     statusText: user.status_text || '',
     phoneVerified: !!user.phone_verified,
     emailVerified: !!user.email_verified,
-    profileCompletion: user.profile_completion || 40,
+    profileCompletion: user.profile_completion || 0,
     firstName: user.first_name || '',
     lastName: user.last_name || '',
     address: user.address || '',
@@ -28,7 +30,15 @@ export const getProfile = async (userId) => {
     hobby: user.hobby || '',
     familyMembers: user.family_members || [],
     premiumStatus: user.premium_status || 'free',
-    selectedServer: user.selected_server || 'Default'
+    selectedServer: user.selected_server || 'Default',
+    age: user.age,
+    profession: user.profession || '',
+    education: user.education || '',
+    hobbies: user.hobbies || [],
+    interests: user.interests || [],
+    theme: user.theme || 'dark',
+    countryCode: user.country_code || '',
+    cityName: user.city_name || ''
   };
 };
 
@@ -47,13 +57,21 @@ export const updateProfile = async (userId, data) => {
     hobby: 'hobby',
     familyMembers: 'family_members',
     premiumStatus: 'premium_status',
-    selectedServer: 'selected_server'
+    selectedServer: 'selected_server',
+    age: 'age',
+    profession: 'profession',
+    education: 'education',
+    hobbies: 'hobbies',
+    interests: 'interests',
+    theme: 'theme',
+    countryCode: 'country_code',
+    cityName: 'city_name'
   };
 
   for (const [key, col] of Object.entries(fieldMap)) {
     if (data[key] !== undefined) {
       updates.push(`${col} = $${idx++}`);
-      params.push(key === 'familyMembers' ? JSON.stringify(data[key]) : data[key]);
+      params.push(data[key]);
     }
   }
 

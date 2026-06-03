@@ -16,6 +16,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   
   bool _isLoading = false;
   bool _otpSent = false;
+  bool _passwordVisible = false;
   String? _error;
   String? _message;
 
@@ -146,10 +147,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _newPasswordController,
-                      obscureText: true,
+                      obscureText: !_passwordVisible,
                       decoration: InputDecoration(
                         labelText: 'New Password',
                         prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(_passwordVisible ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
+                        ),
                         filled: true,
                         fillColor: const Color(0xFF1e293b),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS feature_user_rules (
 
 -- 4. Initial Seed Data
 INSERT INTO feature_flags (feature_key, enabled, description) VALUES
-('nearby_enabled', FALSE, 'Discover users in proximity'),
+('nearby_enabled', TRUE, 'Discover users in proximity'),
 ('file_sharing_enabled', TRUE, 'Allow users to send files'),
 ('video_call_enabled', TRUE, 'Real-time video communication'),
 ('audio_call_enabled', TRUE, 'Real-time voice communication'),

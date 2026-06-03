@@ -14,6 +14,7 @@ import '../../features/notifications/screens/notification_center_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/call/call_preflight_screen.dart';
 import '../../features/profile/screens/contact_detail_screen.dart';
+import '../../features/admin/screens/admin_dashboard_screen.dart';
 
 class ZymiRoutes {
   static const String home = '/home';
@@ -33,6 +34,7 @@ class ZymiRoutes {
   static const String profile = '/profile';
   static const String contactDetail = '/contact_detail';
   static const String callPreflight = '/call_preflight';
+  static const String adminPanel = '/admin_panel';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -86,6 +88,8 @@ class ZymiRoutes {
             isVideo: args?['isVideo'] ?? false,
           ),
         );
+      case adminPanel:
+        return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
       default:
         return MaterialPageRoute(builder: (_) => const ZymiMobileHome());
     }

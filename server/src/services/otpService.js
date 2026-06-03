@@ -15,7 +15,24 @@ export const requestEmailOTP = async (userId, email) => {
     VALUES ($1, $2, $3, $4)
   `, [userId, 'email', otpHash, expiresAt]);
 
-  await sendOTPEmail(email, otp);
+  // Attempt to send email; log OTP as fallback so it never blocks
+  try {
+    await sendOTPEmail(email, otp);
+  } catch (err) {
+    console.warn('[OTP] Email send failed, OTP stored for fallback retrieval:', err.message);
+  }
+
+  // Store in pending_verifications for in-app fallback retrieval
+  try {
+    await run(`
+      INSERT INTO pending_verifications (user_id, type, otp, expires_at)
+      VALUES ($1, 'email_otp', $2, $3)
+      ON CONFLICT (user_id, type) DO UPDATE SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at
+    `, [userId, otp, expiresAt]);
+  } catch (err) {
+    console.warn('[OTP] Could not store pending_verification (table may not exist):', err.message);
+  }
+
   return { success: true };
 };
 
@@ -65,6 +82,17 @@ export const requestPhoneVerificationLink = async (userId, phoneData) => {
     userId
   ]);
 
+  // Store in pending_verifications so the app can retrieve the OTP in-app
+  try {
+    await run(`
+      INSERT INTO pending_verifications (user_id, type, otp, expires_at)
+      VALUES ($1, 'phone_otp', $2, $3)
+      ON CONFLICT (user_id, type) DO UPDATE SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at
+    `, [userId, otp, expiresAt]);
+  } catch (err) {
+    console.warn('[OTP] Could not store pending_verification for phone:', err.message);
+  }
+
   return { token, otp, expiresAt };
 };
 
@@ -111,4 +139,17 @@ export const markTokenOpened = async (token) => {
 export const checkTokenStatus = async (token) => {
   const tokenHash = hashToken(token);
   return await get('SELECT * FROM otp_tokens WHERE token_hash = $1', [tokenHash]);
+};
+
+export const getPendingVerifications = async (userId) => {
+  const rows = await all(`
+    SELECT type, otp, expires_at
+    FROM pending_verifications
+    WHERE user_id = $1 AND expires_at > CURRENT_TIMESTAMP
+  `, [userId]);
+  return rows.map(r => ({
+    type: r.type,
+    otp: r.otp,
+    expiresAt: r.expires_at,
+  }));
 };

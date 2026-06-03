@@ -113,6 +113,11 @@ export const runMigrations = async () => {
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS status_expires_at TIMESTAMP');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS available_hours JSONB');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_server TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS education TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS hobbies TEXT[]');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT[]');
     console.log('[MIGRATION] users table columns verified with profile fields');
   } catch (e) {
     console.warn('[MIGRATION] Could not verify/add columns to users:', e.message);
@@ -205,7 +210,7 @@ export const runMigrations = async () => {
     )
   `);
   const flagsToSeed = [
-    ['nearby_enabled', false, 'Discover users in proximity'],
+    ['nearby_enabled', true, 'Discover users in proximity'],
     ['file_sharing_enabled', true, 'Allow users to send files'],
     ['video_call_enabled', true, 'Real-time video communication'],
     ['audio_call_enabled', true, 'Real-time voice communication'],
@@ -896,6 +901,20 @@ export const runMigrations = async () => {
     )
   `);
   console.log('[MIGRATION] achievements table ready');
+
+  // ─── PENDING VERIFICATIONS ─────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS pending_verifications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      type TEXT NOT NULL,
+      otp TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, type)
+    )
+  `);
+  console.log('[MIGRATION] pending_verifications table ready');
 
   // ─── RLS AUTO-ENABLE SECURITY PATCH ────────────────────────────────────────
   // Revoke public API execution on Supabase's internal rls_auto_enable() helper
