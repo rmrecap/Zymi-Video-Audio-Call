@@ -114,41 +114,18 @@ const io = new Server(httpServer, {
   pingInterval: 25000
 });
 
-const allowedOrigins = [
-  'https://rmrecap.github.io',
-  'http://localhost:5173',
-  'http://localhost:3000'
-];
-
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    console.log(`[CORS_ORIGIN] Incoming origin: "${origin}"`);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      console.warn(`[CORS_REJECTION] Origin not allowed: "${origin}". Allowed:`, allowedOrigins);
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    console.log(`[CORS_ALLOW] Origin accepted: "${origin}"`);
-    return callback(null, true);
-  },
+  origin: 'https://rmrecap.github.io',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.options('*', cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    console.log(`[CORS_PREFLIGHT] Preflight from origin: "${origin}"`);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      return callback(new Error('Origin not allowed'), false);
-    }
-    return callback(null, true);
-  },
+  origin: 'https://rmrecap.github.io',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(helmet());
 app.use(express.json());
