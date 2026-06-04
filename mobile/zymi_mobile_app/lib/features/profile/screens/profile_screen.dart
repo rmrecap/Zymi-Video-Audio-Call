@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../services/api/profile_service.dart';
 import '../../../services/api/auth_service.dart';
 import '../../../core/navigation/zymi_routes.dart';
+import '../../../core/widgets/skeleton_placeholder.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -82,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ProfileSkeleton();
     }
 
     return Scaffold(

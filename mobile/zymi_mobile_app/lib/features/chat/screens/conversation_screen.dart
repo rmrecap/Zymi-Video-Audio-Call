@@ -29,9 +29,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void initState() {
     super.initState();
-    // Assuming we have access to currentUserId via a global state or provider
-    // For now, using a placeholder or identifying from socket client
-    _controller = ChatController(currentUserId: 'me'); // Placeholder
+    _messageController.addListener(_onTextChanged);
+    _controller = ChatController(currentUserId: 'me');
     _controller.selectedUserId = widget.peerId;
     _controller.init();
     _controller.addListener(_onStateChanged);
@@ -40,10 +39,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   void dispose() {
+    _messageController.removeListener(_onTextChanged);
     _controller.removeListener(_onStateChanged);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onStateChanged() {
@@ -67,10 +71,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (_messageController.text.trim().isEmpty) return;
     _controller.sendMessage(_messageController.text.trim());
     _messageController.clear();
+    FocusScope.of(context).unfocus();
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasText = _messageController.text.trim().isNotEmpty;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0f172a),
       appBar: AppBar(
@@ -131,7 +138,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               },
             ),
           ),
-          _buildInputArea(),
+          _buildInputArea(hasText),
         ],
       ),
     );
@@ -157,7 +164,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
-          color: isMine ? const Color(0xFF3B82F6) : const Color(0xFF1E293B), // Blue 500 : Slate 800
+          color: isMine ? const Color(0xFF3B82F6) : const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(16).copyWith(
             bottomRight: isMine ? const Radius.circular(0) : const Radius.circular(16),
             bottomLeft: !isMine ? const Radius.circular(0) : const Radius.circular(16),
@@ -203,7 +210,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Widget _buildInputArea() {
+  Widget _buildInputArea(bool hasText) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: const BoxDecoration(
@@ -214,8 +221,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           IconButton(
-            onPressed: () {
-              // Emoji picker placeholder
+            onPressed: hasText ? null : () {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Emoji picker coming soon')));
             },
             icon: const Icon(Icons.sentiment_satisfied_alt_outlined, color: Colors.white54),
@@ -235,6 +241,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 controller: _messageController,
                 maxLines: 5,
                 minLines: 1,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendMessage(),
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   hintText: 'Type a message...',
@@ -245,18 +253,28 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          _messageController.text.trim().isEmpty
-              ? IconButton(
-                  onPressed: () {
-                    // Voice record placeholder
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice recording coming soon')));
-                  },
-                  icon: const Icon(Icons.mic_none_outlined, color: Colors.blueAccent),
-                )
-              : IconButton(
-                  onPressed: _sendMessage,
-                  icon: const Icon(Icons.send, color: Colors.blueAccent),
-                ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: hasText
+                ? Container(
+                    key: const ValueKey('send'),
+                    decoration: const BoxDecoration(
+                      color: Colors.blueAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: _sendMessage,
+                      icon: const Icon(Icons.send, color: Colors.white),
+                    ),
+                  )
+                : IconButton(
+                    key: const ValueKey('mic'),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice recording coming soon')));
+                    },
+                    icon: const Icon(Icons.mic_none_outlined, color: Colors.blueAccent),
+                  ),
+          ),
         ],
       ),
     );

@@ -11,6 +11,7 @@ import '../../core/navigation/zymi_routes.dart';
 import '../profile/screens/profile_screen.dart';
 import '../call/controllers/call_controller.dart';
 import '../call/screens/incoming_call_screen.dart';
+import '../../core/widgets/skeleton_placeholder.dart';
 
 class ZymiMobileHome extends StatefulWidget {
   const ZymiMobileHome({super.key});
@@ -81,7 +82,7 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
 
   Widget _buildBody() {
     if (_localUserId == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const HomeSkeleton();
     }
 
     return Column(

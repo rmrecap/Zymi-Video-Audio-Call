@@ -2,21 +2,11 @@ import 'package:flutter/material.dart';
 import '../../features/users/widgets/zymi_user_found_dialog.dart';
 import '../../features/users/widgets/zymi_user_not_found_dialog.dart';
 import '../../services/users/phone_lookup_service.dart';
+import '../widgets/skeleton_placeholder.dart';
 
 class PhoneActionGuard {
   static Future<void> handlePhoneClick(BuildContext context, String phone) async {
-    // Show loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
     final result = await PhoneLookupService.lookup(phone);
-
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Remove loading
-    }
 
     if (result.found) {
       if (context.mounted) {
