@@ -1,4 +1,4 @@
-import { config, isProduction, isDevelopment } from '../config/env.js';
+import { config, isProduction } from '../config/env.js';
 
 const ADMIN_WEB_ORIGIN = 'https://rmrecap.github.io';
 
@@ -7,41 +7,41 @@ const getAllowedOrigins = () => {
   return [...new Set([...envOrigins, ADMIN_WEB_ORIGIN])];
 };
 
+export const allowedOrigins = getAllowedOrigins();
+
 export const corsOptions = {
-  origin: isProduction() ? getAllowedOrigins() : '*',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const sanitized = origin.replace(/\/+$/, '');
+    if (getAllowedOrigins().includes(sanitized) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(sanitized)) {
+      callback(null, true);
+    } else {
+      console.error(`[CORS REJECTION] Blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 export const socketCorsOptions = {
-  origin: isProduction() ? getAllowedOrigins() : '*',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const sanitized = origin.replace(/\/+$/, '');
+    if (getAllowedOrigins().includes(sanitized) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(sanitized)) {
+      callback(null, true);
+    } else {
+      console.error(`[CORS REJECTION (Socket)] Blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST'],
   credentials: true
 };
 
 export const isOriginAllowed = (origin) => {
-  if (isDevelopment()) {
-    return true;
-  }
-
-  if (!origin) {
-    return false;
-  }
-
-  const allowedOrigins = getAllowedOrigins();
-  return allowedOrigins.includes(origin);
-};
-
-export const createCorsMiddleware = () => {
-  const { cors } = require('cors');
-
-  if (isProduction()) {
-    return cors(corsOptions);
-  }
-
-  return cors({
-    origin: '*',
-    credentials: true
-  });
+  if (!origin) return false;
+  const sanitized = origin.replace(/\/+$/, '');
+  return getAllowedOrigins().includes(sanitized);
 };
