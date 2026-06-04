@@ -120,10 +120,13 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
+    console.log(`[CORS_ORIGIN] Incoming origin: "${origin}"`);
     if (allowedOrigins.indexOf(origin) === -1) {
+      console.warn(`[CORS_REJECTION] Origin not allowed: "${origin}". Allowed:`, allowedOrigins);
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
+    console.log(`[CORS_ALLOW] Origin accepted: "${origin}"`);
     return callback(null, true);
   },
   credentials: true,
@@ -131,7 +134,19 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-app.options('*', cors());
+app.options('*', cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    console.log(`[CORS_PREFLIGHT] Preflight from origin: "${origin}"`);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('Origin not allowed'), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -300,6 +315,14 @@ setupGroupChatSocket(io, userSockets);
 // Start presence batch broadcasting
 import { batchPresenceBroadcast } from './src/services/presenceService.js';
 batchPresenceBroadcast(io);
+
+// Global Express error handler — ensures structured JSON + CORS headers on all unhandled errors
+app.use((err, req, res, next) => {
+  console.error('[EXPRESS_ERROR]', err.message);
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({ error: 'Internal server error' });
+  }
+});
 
 const PORT = config.port || 5000;
 const startServer = (port) => {

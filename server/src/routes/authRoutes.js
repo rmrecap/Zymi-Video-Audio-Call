@@ -148,35 +148,42 @@ export const resetPassword = async (req, res) => {
 };
 
 export const adminLogin = async (req, res) => {
-  console.log('[INCOMING_PAYLOAD]:', JSON.stringify(req.body));
-  const { username, password } = req.body;
-  console.log('[DEBUG_AUTH] Checking match:', username, 'Input Pass Length:', password?.length);
+  try {
+    console.log('[INCOMING_PAYLOAD]:', JSON.stringify(req.body));
+    const { username, password } = req.body;
+    console.log('[DEBUG_AUTH] Checking match:', username, 'Input Pass Length:', password?.length);
 
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    const admin = await get('SELECT * FROM users WHERE (username = $1 OR email = $2) AND role IN ($3, $4)', username, username, 'admin', 'super_admin');
+
+    if (!admin) {
+      console.warn('[ADMIN_LOGIN] No admin found for:', username);
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+
+    console.log('[ADMIN_LOGIN] Found admin:', admin.username, 'id:', admin.id, 'role:', admin.role, 'hash_exists:', !!admin.password_hash);
+    const storedHash = admin.password_hash || admin.password;
+    if (!storedHash || !bcrypt.compareSync(password, storedHash)) {
+      console.warn('[ADMIN_LOGIN] Password mismatch. Hash source:', admin.password_hash ? 'password_hash' : 'password', 'hash_length:', storedHash?.length);
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+
+    await run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', admin.id);
+
+    const token = createToken(admin);
+    res.json({
+      token,
+      admin: { id: admin.id, username: admin.username, role: admin.role }
+    });
+  } catch (err) {
+    console.error('[ADMIN_LOGIN_CRASH]', err.message, err.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
-
-  const admin = await get('SELECT * FROM users WHERE (username = $1 OR email = $2) AND role IN ($3, $4)', username, username, 'admin', 'super_admin');
-
-  if (!admin) {
-    console.warn('[ADMIN_LOGIN] No admin found for:', username);
-    return res.status(401).json({ error: 'Invalid admin credentials' });
-  }
-
-  console.log('[ADMIN_LOGIN] Found admin:', admin.username, 'id:', admin.id, 'role:', admin.role, 'hash_exists:', !!admin.password_hash);
-  const storedHash = admin.password_hash || admin.password;
-  if (!storedHash || !bcrypt.compareSync(password, storedHash)) {
-    console.warn('[ADMIN_LOGIN] Password mismatch. Hash source:', admin.password_hash ? 'password_hash' : 'password', 'hash_length:', storedHash?.length);
-    return res.status(401).json({ error: 'Invalid admin credentials' });
-  }
-
-  await run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', admin.id);
-
-  const token = createToken(admin);
-  res.json({
-    token,
-    admin: { id: admin.id, username: admin.username, role: admin.role }
-  });
 };
 
 // Router
