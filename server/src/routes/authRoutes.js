@@ -149,7 +149,8 @@ export const resetPassword = async (req, res) => {
 
 export const adminLogin = async (req, res) => {
   const { username, password } = req.body;
-  
+  console.log('[DEBUG_AUTH] Checking match:', username, 'Input Pass Length:', password?.length);
+
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
