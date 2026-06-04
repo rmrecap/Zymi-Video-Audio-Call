@@ -148,6 +148,7 @@ export const resetPassword = async (req, res) => {
 };
 
 export const adminLogin = async (req, res) => {
+  console.log('[INCOMING_PAYLOAD]:', JSON.stringify(req.body));
   const { username, password } = req.body;
   console.log('[DEBUG_AUTH] Checking match:', username, 'Input Pass Length:', password?.length);
 
