@@ -23,22 +23,25 @@ if (pgResult) {
   console.log('[DB] SQLite database initialized (DATABASE_URL not set)');
 }
 
-// Run migrations and seeds
-try {
-  await runMigrations();
-} catch (e) {
-  console.warn('[INDEX] Migration skipped:', e.message);
-}
-try {
-  await initAdminSeed();
-} catch (e) {
-  console.warn('[INDEX] Admin seed skipped:', e.message);
-}
-try {
-  await seedDemoUsers();
-} catch (e) {
-  console.warn('[INDEX] Demo user seed skipped:', e.message);
-}
+// Defer migrations and seeds to background — bind port first for Render health check
+const startupTasks = (async () => {
+  try {
+    await runMigrations();
+    console.log('[STARTUP] Core migrations completed');
+  } catch (e) {
+    console.warn('[STARTUP] Migration skipped:', e.message);
+  }
+  try {
+    await initAdminSeed();
+  } catch (e) {
+    console.warn('[STARTUP] Admin seed skipped:', e.message);
+  }
+  try {
+    await seedDemoUsers();
+  } catch (e) {
+    console.warn('[STARTUP] Demo user seed skipped:', e.message);
+  }
+})().catch(e => console.error('[STARTUP_FATAL]', e.message));
 
 // Other services
 // import { createBlockTable } from './src/services/blockService.js';
@@ -254,13 +257,7 @@ app.set('callActivity', callActivity);
 app.set('io', io);
 app.set('serverStartTime', serverStartTime);
 
-// Socket services
-const redisResult = await initRedis(io);
-if (redisResult.adapter) {
-  io.adapter(redisResult.adapter);
-}
-
-// Sync database settings to Redis cache
+// Defer Redis init and feature sync to background — not required for port binding
 import { db } from './src/db/db_provider.js';
 async function syncFeaturesToRedis() {
   const redisClient = getRedisClient();
@@ -286,7 +283,17 @@ async function syncFeaturesToRedis() {
     }
   }
 }
-await syncFeaturesToRedis();
+startupTasks.then(async () => {
+  try {
+    const redisResult = await initRedis(io);
+    if (redisResult.adapter) {
+      io.adapter(redisResult.adapter);
+    }
+    await syncFeaturesToRedis();
+  } catch (err) {
+    console.warn('[STARTUP] Redis init deferred:', err.message);
+  }
+});
 
 import { registry } from './src/socket/userSocketRegistry.js';
 
@@ -325,17 +332,14 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = config.port || 5000;
-const startServer = (port) => {
-  httpServer.listen(port, '0.0.0.0', () => {
-    console.log(`ZYMI server running on port ${port} (0.0.0.0)`);
-  }).on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      startServer(port + 1);
-    } else {
-      process.exit(1);
-    }
-  });
-};
-
-startServer(PORT);
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`[BOOT] Server actively listening on port ${PORT}`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    httpServer.listen(PORT + 1, '0.0.0.0');
+  } else {
+    console.error('[BOOT] Fatal listen error:', err.message);
+    process.exit(1);
+  }
+});
 export const getApp = () => app;
