@@ -31,16 +31,17 @@ export default function LoginPage() {
         </div>
         <form onSubmit={handleSubmit} className="bg-cyber-card border border-cyber-border rounded-2xl p-8 space-y-5">
           <div>
-            <label className="text-xs font-mono text-white/40 tracking-wider block mb-1.5">SERVER URL</label>
+            <label className="text-xs font-mono text-cyber-accent/70 tracking-wider block mb-1.5">⟐ BACKEND SERVER URL</label>
             <input value={apiBase} onChange={(e) => setApiBase(e.target.value)} placeholder="https://zymi-server.onrender.com" className="w-full px-4 py-3 rounded-xl text-sm font-mono" />
+            <p className="text-[9px] text-white/20 mt-1 font-mono">The Render server URL, not the admin portal URL</p>
           </div>
           <div>
-            <label className="text-xs font-mono text-white/40 tracking-wider block mb-1.5">ADMIN USERNAME</label>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-4 py-3 rounded-xl text-sm font-mono" />
+            <label className="text-xs font-mono text-white/40 tracking-wider block mb-1.5">ADMIN USERNAME / EMAIL</label>
+            <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin_super or admin@zymi.com" className="w-full px-4 py-3 rounded-xl text-sm font-mono" />
           </div>
           <div>
             <label className="text-xs font-mono text-white/40 tracking-wider block mb-1.5">PASSWORD</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl text-sm font-mono" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full px-4 py-3 rounded-xl text-sm font-mono" />
           </div>
           {error && <p className="text-cyber-red text-sm font-mono text-center">⛔ {error}</p>}
           <button type="submit" disabled={loading} className="w-full py-3 bg-cyber-accent/10 border border-cyber-accent/40 text-cyber-accent rounded-xl font-mono font-bold tracking-wider hover:bg-cyber-accent/20 disabled:opacity-50">

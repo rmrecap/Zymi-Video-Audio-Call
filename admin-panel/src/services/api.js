@@ -19,6 +19,15 @@ api.interceptors.response.use(
       console.warn('[SECURITY] Session terminated — 403 Forbidden from backend');
       window.location.href = '/Zymi-Video-Audio-Call/login';
     }
+    const contentType = err.response?.headers?.['content-type'] || '';
+    if (contentType.includes('text/html')) {
+      const htmlError = new Error(
+        'Backend returned HTML (status ' + (err.response?.status || '???') + ') instead of JSON. ' +
+        'The server URL may be pointing to the admin portal instead of the Render backend, or the server is asleep.'
+      );
+      htmlError.isHtmlResponse = true;
+      return Promise.reject(htmlError);
+    }
     return Promise.reject(err);
   }
 );
