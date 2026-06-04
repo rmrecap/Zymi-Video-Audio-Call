@@ -53,7 +53,8 @@ export const login = async (req, res) => {
     }
 
     console.log('[AUTH] User found, verifying password...');
-    if (!bcrypt.compareSync(password, user.password_hash)) {
+    const storedHash = user.password_hash || user.password;
+    if (!storedHash || !bcrypt.compareSync(password, storedHash)) {
       console.log('[AUTH] Password mismatch');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -159,7 +160,8 @@ export const adminLogin = async (req, res) => {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
-  if (!bcrypt.compareSync(password, admin.password_hash)) {
+  const storedHash = admin.password_hash || admin.password;
+  if (!storedHash || !bcrypt.compareSync(password, storedHash)) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 

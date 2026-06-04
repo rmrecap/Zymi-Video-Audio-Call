@@ -286,7 +286,8 @@ export const changePassword = async (req, res) => {
   try {
     const admin = await get('SELECT * FROM users WHERE id = $1', req.adminUser.id);
 
-    if (!admin || !bcrypt.compareSync(currentPassword, admin.password_hash)) {
+    const adminStoredHash = admin.password_hash || admin.password;
+    if (!admin || !adminStoredHash || !bcrypt.compareSync(currentPassword, adminStoredHash)) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 

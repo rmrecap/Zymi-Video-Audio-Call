@@ -56,16 +56,29 @@ export const forceSeedMasterAdmin = async () => {
   const hash = await bcrypt.hash('demo123', 10);
 
   await run(
-    `INSERT INTO users (username, email, password_hash, role)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (username, email, password_hash, password, role)
+     VALUES ($1, $2, $3, $3, $4)
      ON CONFLICT (username) DO UPDATE SET
        email = EXCLUDED.email,
        password_hash = EXCLUDED.password_hash,
+       password = EXCLUDED.password,
        role = EXCLUDED.role`,
     'admin_super', 'admin@zymi.com', hash, 'super_admin'
   );
 
-  console.log('[ADMIN_SEED] Verified and overwritten super admin master record!');
-  const record = await get("SELECT id, username, role FROM users WHERE username = $1", ['admin_super']);
+  const record = await get(
+    "SELECT id, username, role, password_hash, password FROM users WHERE username = $1",
+    ['admin_super']
+  );
+
+  const storedHash = record?.password_hash || record?.password;
+  const verify = storedHash ? bcrypt.compareSync('demo123', storedHash) : false;
+
+  if (record && verify) {
+    console.log('[ADMIN_SEED] ABSOLUTE SUCCESS: Node-hashed master admin inserted and verified.');
+  } else {
+    console.error('[ADMIN_SEED] FAILURE: Hash mismatch after upsert. Stored hash:', storedHash);
+  }
+
   return record;
 };

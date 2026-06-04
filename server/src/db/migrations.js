@@ -113,6 +113,7 @@ export const runMigrations = async () => {
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS status_expires_at TIMESTAMP');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS available_hours JSONB');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_server TEXT');
+    await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT');
     await exec('ALTER TABLE users ADD COLUMN IF NOT EXISTS education TEXT');
