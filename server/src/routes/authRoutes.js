@@ -151,39 +151,45 @@ export const adminLogin = async (req, res) => {
   try {
     console.log('[INCOMING_PAYLOAD]:', JSON.stringify(req.body));
     const { username, password } = req.body;
-    console.log('[DEBUG_AUTH] Checking match:', username, 'Input Pass Length:', password?.length);
 
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    const admin = await get('SELECT * FROM users WHERE (username = $1 OR email = $2) AND role IN ($3, $4)', username, username, 'admin', 'super_admin');
+    const userRow = await get(
+      'SELECT * FROM users WHERE (username = $1 OR email = $2)',
+      username, username
+    );
 
-    console.log('[AUTH_DEBUG] Found User Row:', admin ? { id: admin.id, username: admin.username, role: admin.role, hasHash: !!admin.password_hash } : 'NO_USER_FOUND');
+    console.log('[LEGACY_AUTH_DEBUG] Raw DB Row Fetched:', userRow ? { id: userRow.id, email: userRow.email } : 'NULL');
 
-    if (!admin) {
+    if (!userRow) {
       return res.status(401).json({ error: 'Invalid admin credentials' });
     }
 
-    let storedHash = admin.password_hash || admin.password;
-    // Force normalize hash prefix for node-bcryptjs cross-compatibility ($2b$ → $2a$)
-    if (storedHash && storedHash.startsWith('$2b$')) {
-      storedHash = '$2a$' + storedHash.slice(4);
-    }
-
-    const isPasswordValid = bcrypt.compareSync(password, storedHash);
-    console.log('[AUTH_DEBUG] Bcrypt Match Result:', isPasswordValid);
-
-    if (!isPasswordValid) {
+    let databaseHash = userRow.password_hash || userRow.password;
+    if (!databaseHash) {
+      console.log('[LEGACY_AUTH_ERROR] No password string found in any expected column matrix.');
       return res.status(401).json({ error: 'Invalid admin credentials' });
     }
 
-    await run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', admin.id);
+    if (databaseHash.startsWith('$2b$')) {
+      databaseHash = '$2a$' + databaseHash.slice(4);
+    }
 
-    const token = createToken(admin);
+    const isMatch = bcrypt.compareSync(password, databaseHash);
+    console.log('[LEGACY_AUTH_DEBUG] Password check outcome:', isMatch);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+
+    await run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', userRow.id);
+
+    const token = createToken(userRow);
     res.json({
       token,
-      admin: { id: admin.id, username: admin.username, role: admin.role }
+      admin: { id: userRow.id, username: userRow.username, role: userRow.role || 'admin' }
     });
   } catch (err) {
     console.error('[ADMIN_LOGIN_CRASH]', err.message, err.stack);
