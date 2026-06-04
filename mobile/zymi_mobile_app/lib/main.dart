@@ -9,35 +9,41 @@ import 'services/governance/policy_gate_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  WidgetsBinding.instance.addObserver(ZymiAppLifecycleObserver());
-  
-  final authService = AuthService();
-  final token = await authService.getToken();
-  
-  // Initialize the Background Socket Service (Heartbeat Isolate)
-  if (token != null) {
-    await BackgroundSocketService.initializeService();
-    FlutterBackgroundService().on('sync_ui_state').listen((event) {
-      if (event != null) {
-        CallSyncService.handleSyncState(event);
-      }
-    });
-    FlutterBackgroundService().on('policy_update').listen((event) {
-      if (event != null) {
-        PolicyGateService().updateFromDaemon(Map<String, dynamic>.from(event));
-      }
-    });
-    FlutterBackgroundService().on('nearby_settings_update').listen((event) {
-      if (event != null) {
-        final radius = event['radius'] as int? ?? 10000;
-        final fuzzing = event['fuzzing'] == true;
-        PolicyGateService().updateNearbySettings(radius, fuzzing);
-      }
-    });
+
+  String initialRoute;
+  try {
+    WidgetsBinding.instance.addObserver(ZymiAppLifecycleObserver());
+
+    final authService = AuthService();
+    final token = await authService.getToken();
+
+    if (token != null) {
+      await BackgroundSocketService.initializeService();
+      FlutterBackgroundService().on('sync_ui_state').listen((event) {
+        if (event != null) {
+          CallSyncService.handleSyncState(event);
+        }
+      });
+      FlutterBackgroundService().on('policy_update').listen((event) {
+        if (event != null) {
+          PolicyGateService().updateFromDaemon(Map<String, dynamic>.from(event));
+        }
+      });
+      FlutterBackgroundService().on('nearby_settings_update').listen((event) {
+        if (event != null) {
+          final radius = event['radius'] as int? ?? 10000;
+          final fuzzing = event['fuzzing'] == true;
+          PolicyGateService().updateNearbySettings(radius, fuzzing);
+        }
+      });
+    }
+
+    initialRoute = token != null ? ZymiRoutes.home : ZymiRoutes.login;
+  } catch (e) {
+    debugPrint('[MAIN] Startup error, falling back to login: $e');
+    initialRoute = ZymiRoutes.login;
   }
 
-  final initialRoute = token != null ? ZymiRoutes.home : ZymiRoutes.login;
-  
   runApp(MyApp(initialRoute: initialRoute));
 }
 

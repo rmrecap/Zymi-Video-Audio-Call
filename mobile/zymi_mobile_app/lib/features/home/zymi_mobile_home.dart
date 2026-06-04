@@ -58,18 +58,22 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
   }
 
   Future<void> _initAuthAndSocket() async {
-    final user = await _authService.getMe();
-    if (user != null && mounted) {
-      setState(() {
-        _user = user;
-        _localUserId = user['id'].toString();
-      });
-      _socketClient.connect(_localUserId!);
-    } else {
-      // Not authenticated, redirect to login
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, ZymiRoutes.login);
+    try {
+      final user = await _authService.getMe();
+      if (user != null && mounted) {
+        setState(() {
+          _user = user;
+          _localUserId = user['id'].toString();
+        });
+        _socketClient.connect(_localUserId!);
+        return;
       }
+    } catch (e) {
+      debugPrint('[HOME] Auth init failed: $e');
+    }
+    // Not authenticated or network error — redirect to login
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, ZymiRoutes.login);
     }
   }
 
@@ -117,9 +121,12 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Scaffold(
       backgroundColor: const Color(0xFF0f172a),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF1e293b),
         title: Row(
           children: [
@@ -182,6 +189,7 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
           BottomNavigationBarItem(icon: Icon(Icons.radar), label: 'Nearby'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
+      ),
       ),
     );
   }
