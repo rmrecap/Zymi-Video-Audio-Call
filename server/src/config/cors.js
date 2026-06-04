@@ -1,14 +1,21 @@
 import { config, isProduction, isDevelopment } from '../config/env.js';
 
+const ADMIN_WEB_ORIGIN = 'https://rmrecap.github.io';
+
+const getAllowedOrigins = () => {
+  const envOrigins = (config.clientOrigin || '').split(',').map(o => o.trim()).filter(Boolean);
+  return [...new Set([...envOrigins, ADMIN_WEB_ORIGIN])];
+};
+
 export const corsOptions = {
-  origin: isProduction() ? config.clientOrigin : '*',
+  origin: isProduction() ? getAllowedOrigins() : '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 export const socketCorsOptions = {
-  origin: isProduction() ? config.clientOrigin : '*',
+  origin: isProduction() ? getAllowedOrigins() : '*',
   methods: ['GET', 'POST'],
   credentials: true
 };
@@ -22,7 +29,7 @@ export const isOriginAllowed = (origin) => {
     return false;
   }
 
-  const allowedOrigins = config.clientOrigin.split(',').map(o => o.trim());
+  const allowedOrigins = getAllowedOrigins();
   return allowedOrigins.includes(origin);
 };
 

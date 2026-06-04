@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { scrollbar-color: #00f0ff #111827; scrollbar-width: thin; }
+body { background: #0a0e1a; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; }
+input, select, textarea { background: #1e293b !important; border: 1px solid #334155 !important; color: #e2e8f0 !important; }
+input:focus, select:focus, textarea:focus { border-color: #00f0ff !important; outline: none !important; box-shadow: 0 0 0 1px #00f0ff !important; }
+button { transition: all 0.15s ease; }
+@keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 4px #00f0ff44; } 50% { box-shadow: 0 0 12px #00f0ff88; } }
+.glow-card { animation: pulse-glow 3s ease-in-out infinite; }
