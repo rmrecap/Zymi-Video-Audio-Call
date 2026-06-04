@@ -9,8 +9,9 @@ export function AuthProvider({ children }) {
     return stored ? JSON.parse(stored) : null;
   });
 
-  const login = async (username, password, apiBase) => {
-    const res = await fetch(`${apiBase}/api/admin/login`, {
+  const login = async (username, password, backendUrl) => {
+    const endpoint = `${backendUrl}/api/admin/login`;
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -34,7 +35,7 @@ export function AuthProvider({ children }) {
     if (!res.ok) throw new Error(data.error || 'Login failed');
     sessionStorage.setItem('zymi_admin_token', data.token);
     sessionStorage.setItem('zymi_admin_user', JSON.stringify(data.admin));
-    sessionStorage.setItem('zymi_api_base', apiBase);
+    sessionStorage.setItem('zymi_api_base', backendUrl);
     setToken(data.token);
     setAdmin(data.admin);
     return data;
