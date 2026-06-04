@@ -121,8 +121,8 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
       backgroundColor: const Color(0xFF0f172a),
       appBar: AppBar(

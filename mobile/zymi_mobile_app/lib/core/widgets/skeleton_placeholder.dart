@@ -62,20 +62,20 @@ class ProfileSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
+    return const Padding(
+      padding: EdgeInsets.all(24),
       child: Column(
         children: [
-          const SkeletonPlaceholder(width: 120, height: 120, borderRadius: 60),
-          const SizedBox(height: 24),
-          const SkeletonPlaceholder(width: 180, height: 24),
-          const SizedBox(height: 32),
-          const SkeletonPlaceholder(height: 160),
-          const SizedBox(height: 24),
-          const SkeletonPlaceholder(height: 80),
-          const SizedBox(height: 32),
-          const SkeletonPlaceholder(height: 48),
-          const SkeletonPlaceholder(height: 48),
+          SkeletonPlaceholder(width: 120, height: 120, borderRadius: 60),
+          SizedBox(height: 24),
+          SkeletonPlaceholder(width: 180, height: 24),
+          SizedBox(height: 32),
+          SkeletonPlaceholder(height: 160),
+          SizedBox(height: 24),
+          SkeletonPlaceholder(height: 80),
+          SizedBox(height: 32),
+          SkeletonPlaceholder(height: 48),
+          SkeletonPlaceholder(height: 48),
         ],
       ),
     );
@@ -92,24 +92,24 @@ class HomeSkeleton extends StatelessWidget {
       child: Column(
         children: [
           for (int i = 0; i < 6; i++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 children: [
-                  const SkeletonPlaceholder(width: 48, height: 48, borderRadius: 24),
-                  const SizedBox(width: 12),
+                  SkeletonPlaceholder(width: 48, height: 48, borderRadius: 24),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SkeletonPlaceholder(width: 140, height: 16),
-                        const SizedBox(height: 6),
-                        const SkeletonPlaceholder(height: 14),
+                        SkeletonPlaceholder(width: 140, height: 16),
+                        SizedBox(height: 6),
+                        SkeletonPlaceholder(height: 14),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const SkeletonPlaceholder(width: 24, height: 24, borderRadius: 12),
+                  SizedBox(width: 8),
+                  SkeletonPlaceholder(width: 24, height: 24, borderRadius: 12),
                 ],
               ),
             ),
