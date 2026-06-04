@@ -53,31 +53,30 @@ export const checkSuperAdminExists = async () => {
 };
 
 export const forceSeedMasterAdmin = async () => {
-  const hash = await bcrypt.hash('demo123', 10);
+  const plainPassword = 'demo123';
+  const secureHash = await bcrypt.hash(plainPassword, 10);
 
   await run(
-    `INSERT INTO users (username, email, password_hash, password, role)
-     VALUES ($1, $2, $3, $3, $4)
+    `INSERT INTO users (username, email, password_hash, role)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (username) DO UPDATE SET
-       email = EXCLUDED.email,
        password_hash = EXCLUDED.password_hash,
-       password = EXCLUDED.password,
        role = EXCLUDED.role`,
-    'admin_super', 'admin@zymi.com', hash, 'super_admin'
+    ['admin_super', 'admin@zymi.com', secureHash, 'super_admin']
   );
 
   const record = await get(
-    "SELECT id, username, role, password_hash, password FROM users WHERE username = $1",
+    "SELECT id, username, role, password_hash FROM users WHERE username = $1",
     ['admin_super']
   );
 
-  const storedHash = record?.password_hash || record?.password;
-  const verify = storedHash ? bcrypt.compareSync('demo123', storedHash) : false;
+  const storedHash = record?.password_hash;
+  const verify = storedHash ? bcrypt.compareSync(plainPassword, storedHash) : false;
 
   if (record && verify) {
-    console.log('[ADMIN_SEED] ABSOLUTE SUCCESS: Node-hashed master admin inserted and verified.');
+    console.log('[ROOT_FIX] Node-compatible master admin synced successfully!');
   } else {
-    console.error('[ADMIN_SEED] FAILURE: Hash mismatch after upsert. Stored hash:', storedHash);
+    console.error('[ROOT_FIX] FAILURE — stored hash:', storedHash, 'record:', record ? 'found' : 'null');
   }
 
   return record;

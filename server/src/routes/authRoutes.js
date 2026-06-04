@@ -157,11 +157,14 @@ export const adminLogin = async (req, res) => {
   const admin = await get('SELECT * FROM users WHERE (username = $1 OR email = $2) AND role IN ($3, $4)', username, username, 'admin', 'super_admin');
 
   if (!admin) {
+    console.warn('[ADMIN_LOGIN] No admin found for:', username);
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
+  console.log('[ADMIN_LOGIN] Found admin:', admin.username, 'id:', admin.id, 'role:', admin.role, 'hash_exists:', !!admin.password_hash);
   const storedHash = admin.password_hash || admin.password;
   if (!storedHash || !bcrypt.compareSync(password, storedHash)) {
+    console.warn('[ADMIN_LOGIN] Password mismatch. Hash source:', admin.password_hash ? 'password_hash' : 'password', 'hash_length:', storedHash?.length);
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
