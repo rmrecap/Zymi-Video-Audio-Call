@@ -112,16 +112,17 @@ const io = new Server(httpServer, {
 });
 
 const allowedOrigins = [
+  'https://rmrecap.github.io',
+  'http://localhost:3000',
+  'http://localhost:5173',
   corsOrigin,
   'http://127.0.0.1:5175',
-  'https://rmrecap.github.io',
 ].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    const sanitized = origin.replace(/\/+$/, '');
-    if (allowedOrigins.includes(sanitized) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(sanitized)) {
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.error(`[CORS REJECTION] Blocked origin: ${origin}`);
@@ -130,11 +131,12 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 
-app.use(helmet());
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(globalLimiter);
