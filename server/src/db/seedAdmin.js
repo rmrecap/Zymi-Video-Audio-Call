@@ -51,3 +51,21 @@ export const checkSuperAdminExists = async () => {
   const valid = bcrypt.compareSync(adminPassword, admin.password_hash);
   return valid ? admin : null;
 };
+
+export const forceSeedMasterAdmin = async () => {
+  const hash = await bcrypt.hash('demo123', 10);
+
+  await run(
+    `INSERT INTO users (username, email, password_hash, role)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (username) DO UPDATE SET
+       email = EXCLUDED.email,
+       password_hash = EXCLUDED.password_hash,
+       role = EXCLUDED.role`,
+    'admin_super', 'admin@zymi.com', hash, 'super_admin'
+  );
+
+  console.log('[ADMIN_SEED] Verified and overwritten super admin master record!');
+  const record = await get("SELECT id, username, role FROM users WHERE username = $1", ['admin_super']);
+  return record;
+};
