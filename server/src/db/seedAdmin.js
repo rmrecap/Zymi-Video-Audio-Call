@@ -10,14 +10,21 @@ export const seedSuperAdmin = async () => {
   const hash = await bcrypt.hash(adminPassword, 12);
 
   if (existingSuperAdmin) {
-    if (existingSuperAdmin.password_hash) {
-      console.log('[SEED] Super admin already exists and is configured:', existingSuperAdmin.username);
+    const match = existingSuperAdmin.password_hash
+      ? bcrypt.compareSync(adminPassword, existingSuperAdmin.password_hash)
+      : false;
+
+    if (match) {
+      console.log('[SEED] Super admin already exists and password verified:', existingSuperAdmin.username);
       return null;
-    } else {
-      console.log('[SEED] Super admin exists but missing password hash, updating...');
-      await run('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, existingSuperAdmin.id]);
-      return { id: existingSuperAdmin.id, username: existingSuperAdmin.username };
     }
+
+    console.log('[SEED] Super admin exists but password hash is invalid or placeholder. Updating...');
+    await run(
+      'UPDATE users SET password_hash = $1, username = $2 WHERE id = $3',
+      [hash, adminUsername, existingSuperAdmin.id]
+    );
+    return { id: existingSuperAdmin.id, username: adminUsername };
   }
 
   if (!adminPassword || adminPassword === 'change_this_password') {
@@ -39,5 +46,8 @@ export const seedSuperAdmin = async () => {
 
 export const checkSuperAdminExists = async () => {
   const admin = await get("SELECT id, username, password_hash FROM users WHERE role = $1", ['super_admin']);
-  return admin && admin.password_hash ? admin : null;
+  if (!admin || !admin.password_hash) return null;
+  const adminPassword = config.superAdminPassword || 'admin123';
+  const valid = bcrypt.compareSync(adminPassword, admin.password_hash);
+  return valid ? admin : null;
 };

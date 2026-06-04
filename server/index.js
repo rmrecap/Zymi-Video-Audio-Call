@@ -34,7 +34,11 @@ try {
 } catch (e) {
   console.warn('[INDEX] Admin seed skipped:', e.message);
 }
-// await seedDemoUsers();
+try {
+  await seedDemoUsers();
+} catch (e) {
+  console.warn('[INDEX] Demo user seed skipped:', e.message);
+}
 
 // Other services
 // import { createBlockTable } from './src/services/blockService.js';
