@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import StatCard from '../components/StatCard';
 
@@ -8,6 +9,7 @@ export default function DashboardPage() {
   const [callHealth, setCallHealth] = useState(null);
   const [socketHealth, setSocketHealth] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const fetchAll = async () => {
     setLoading(true);
@@ -40,19 +42,19 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Active Users" value={stats?.totalUsers} icon="◉" color="text-cyber-accent" />
-        <StatCard label="Messages Sent" value={stats?.totalMessages} icon="◈" color="text-cyber-green" />
-        <StatCard label="Active Connections" value={stats?.activeConnections} icon="◉" color="text-cyber-amber" />
+        <StatCard label="Active Users" value={stats?.totalUsers} icon="◉" color="text-cyber-accent" to="/users" />
+        <StatCard label="Messages Sent" value={stats?.totalMessages} icon="◈" color="text-cyber-green" to="/audit" />
+        <StatCard label="Active Connections" value={stats?.activeConnections} icon="◉" color="text-cyber-amber" to="/presence" />
         <StatCard label="Server Uptime" value={formatUptime(stats?.serverUptime)} icon="⏱" color="text-cyber-purple" />
-        <StatCard label="Calls Today" value={stats?.callsToday} icon="◈" color="text-cyber-green" />
-        <StatCard label="Messages Today" value={stats?.messagesToday} icon="◈" color="text-cyber-accent" />
-        <StatCard label="Active Calls" value={callHealth?.activeCalls ?? stats?.activeCalls} icon="◉" color="text-cyber-amber" />
-        <StatCard label="Avg Call Duration" value={callHealth?.averageCallDuration ? `${Math.round(callHealth.averageCallDuration / 60)}m` : '—'} icon="⏱" color="text-cyber-purple" />
+        <StatCard label="Calls Today" value={stats?.callsToday} icon="◈" color="text-cyber-green" to="/features" />
+        <StatCard label="Messages Today" value={stats?.messagesToday} icon="◈" color="text-cyber-accent" to="/audit" />
+        <StatCard label="Active Calls" value={callHealth?.activeCalls ?? stats?.activeCalls} icon="◉" color="text-cyber-amber" to="/presence" />
+        <StatCard label="Avg Call Duration" value={callHealth?.averageCallDuration ? `${Math.round(callHealth.averageCallDuration / 60)}m` : '—'} icon="⏱" color="text-cyber-purple" to="/features" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-cyber-card border border-cyber-border rounded-xl p-5">
-          <h3 className="text-xs font-mono text-white/40 tracking-wider mb-3">MESSAGE HEALTH</h3>
+        <button onClick={() => navigate('/audit')} className="bg-cyber-card border border-cyber-border rounded-xl p-5 text-left hover:border-cyber-accent/50 hover:bg-cyber-accent/5 transition-all cursor-pointer">
+          <h3 className="text-xs font-mono text-white/40 tracking-wider mb-3">MESSAGE HEALTH <span className="text-cyber-accent">→</span></h3>
           <div className="space-y-2 text-sm font-mono">
             <div className="flex justify-between"><span className="text-white/50">Total</span><span className="text-cyber-accent">{messageHealth?.totalMessages ?? '—'}</span></div>
             <div className="flex justify-between"><span className="text-white/50">Today</span><span className="text-cyber-green">{messageHealth?.messagesToday ?? '—'}</span></div>
@@ -60,18 +62,18 @@ export default function DashboardPage() {
             <div className="flex justify-between"><span className="text-white/50">Reported</span><span className="text-cyber-red">{messageHealth?.reportedMessages ?? '—'}</span></div>
             <div className="flex justify-between"><span className="text-white/50">Health</span><span className={messageHealth?.healthScore > 80 ? 'text-cyber-green' : 'text-cyber-amber'}>{messageHealth?.healthScore ?? '—'}%</span></div>
           </div>
-        </div>
-        <div className="bg-cyber-card border border-cyber-border rounded-xl p-5">
-          <h3 className="text-xs font-mono text-white/40 tracking-wider mb-3">CALL HEALTH</h3>
+        </button>
+        <button onClick={() => navigate('/features')} className="bg-cyber-card border border-cyber-border rounded-xl p-5 text-left hover:border-cyber-accent/50 hover:bg-cyber-accent/5 transition-all cursor-pointer">
+          <h3 className="text-xs font-mono text-white/40 tracking-wider mb-3">CALL HEALTH <span className="text-cyber-accent">→</span></h3>
           <div className="space-y-2 text-sm font-mono">
             <div className="flex justify-between"><span className="text-white/50">Total Calls</span><span className="text-cyber-accent">{callHealth?.totalCalls ?? '—'}</span></div>
             <div className="flex justify-between"><span className="text-white/50">Today</span><span className="text-cyber-green">{callHealth?.callsToday ?? '—'}</span></div>
             <div className="flex justify-between"><span className="text-white/50">Failed Today</span><span className="text-cyber-red">{callHealth?.failedCallsToday ?? '—'}</span></div>
             <div className="flex justify-between"><span className="text-white/50">Avg Duration</span><span className="text-cyber-amber">{callHealth?.averageCallDuration ? `${Math.round(callHealth.averageCallDuration / 60)}m` : '—'}</span></div>
           </div>
-        </div>
-        <div className="bg-cyber-card border border-cyber-border rounded-xl p-5">
-          <h3 className="text-xs font-mono text-white/40 tracking-wider mb-3">SOCKET REGISTRY</h3>
+        </button>
+        <button onClick={() => navigate('/presence')} className="bg-cyber-card border border-cyber-border rounded-xl p-5 text-left hover:border-cyber-accent/50 hover:bg-cyber-accent/5 transition-all cursor-pointer">
+          <h3 className="text-xs font-mono text-white/40 tracking-wider mb-3">SOCKET REGISTRY <span className="text-cyber-accent">→</span></h3>
           <div className="space-y-2 text-sm font-mono">
             <div className="flex justify-between"><span className="text-white/50">Local Map</span><span className="text-cyber-accent">{socketHealth?.localMapSize ?? '—'}</span></div>
             <div className="flex justify-between"><span className="text-white/50">Redis</span><span className={socketHealth?.redisAvailable ? 'text-cyber-green' : 'text-cyber-amber'}>{socketHealth?.redisAvailable ? 'ACTIVE' : 'OFFLINE'}</span></div>
@@ -82,7 +84,7 @@ export default function DashboardPage() {
               <p className="text-cyber-red text-[10px] font-mono">{socketHealth.warnings.join('; ')}</p>
             </div>
           )}
-        </div>
+        </button>
       </div>
 
       {(stats?.metrics) && (

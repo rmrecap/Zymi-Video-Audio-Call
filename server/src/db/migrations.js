@@ -382,6 +382,30 @@ export const runMigrations = async () => {
   await run(
     "INSERT INTO ad_global_settings (id, ads_enabled, test_mode, active_network) VALUES (1, TRUE, FALSE, 'admob') ON CONFLICT (id) DO NOTHING"
   );
+  // Add placement & behavioral columns
+  try {
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS chat_list_ad_interval INTEGER DEFAULT 10");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS chat_list_ad_free_first INTEGER DEFAULT 5");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS chat_list_vip_ad_interval INTEGER DEFAULT 15");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS scroll_aware_enabled BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS chat_open_ad_enabled BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS call_end_interstitial_cooldown_minutes INTEGER DEFAULT 30");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS call_end_interstitial_min_calls INTEGER DEFAULT 3");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS settings_banner_enabled BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS coin_shop_rewarded_enabled BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS exit_intent_enabled BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS exit_intent_chance_percent INTEGER DEFAULT 30");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS exit_intent_vip_exempt BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS exit_intent_rage_exempt BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS silent_rewarded_enabled BOOLEAN DEFAULT TRUE");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS ad_free_minutes_coin_cost INTEGER DEFAULT 50");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS night_mode_start_hour INTEGER DEFAULT 23");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS night_mode_end_hour INTEGER DEFAULT 7");
+    await exec("ALTER TABLE ad_global_settings ADD COLUMN IF NOT EXISTS night_mode_dampen_percent INTEGER DEFAULT 80");
+    console.log('[MIGRATION] ad_global_settings placement & behavioral columns verified');
+  } catch (e) {
+    console.warn('[MIGRATION] Could not add placement/behavioral columns to ad_global_settings:', e.message);
+  }
   console.log('[MIGRATION] ad_global_settings table ready');
 
   // ─── AD NETWORK CONFIGS ───────────────────────────────────────────────────

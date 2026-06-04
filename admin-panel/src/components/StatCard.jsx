@@ -1,13 +1,18 @@
-export default function StatCard({ label, value, icon, color }) {
+import { useNavigate } from 'react-router-dom';
+
+export default function StatCard({ label, value, icon, color, to }) {
+  const navigate = useNavigate();
+  const Comp = to ? 'button' : 'div';
   return (
-    <div className="bg-cyber-card border border-cyber-border rounded-xl p-5 glow-card">
+    <Comp onClick={() => to && navigate(to)}
+      className={`bg-cyber-card border border-cyber-border rounded-xl p-5 glow-card ${to ? 'cursor-pointer hover:border-cyber-accent/50 hover:bg-cyber-accent/5 transition-all' : ''}`}>
       <div className="flex items-start justify-between">
-        <div>
+        <div className="text-left">
           <p className="text-xs font-mono text-white/40 tracking-wider uppercase">{label}</p>
           <p className={`text-3xl font-bold mt-2 font-mono ${color || 'text-white'}`}>{value ?? '—'}</p>
         </div>
         <span className="text-2xl opacity-60">{icon}</span>
       </div>
-    </div>
+    </Comp>
   );
 }

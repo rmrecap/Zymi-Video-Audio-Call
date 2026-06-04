@@ -77,26 +77,49 @@ export const adConfigService = {
   updateGlobalSettings: async (settings, adminId) => {
     await adConfigService.createSnapshot();
     const old = await adConfigService.getGlobalSettings();
-    const { ads_enabled, test_mode, active_network, fallback_network, interstitial_gap_seconds, native_refresh_seconds } = settings;
-    
+    const {
+      ads_enabled, test_mode, active_network, fallback_network,
+      interstitial_gap_seconds, native_refresh_seconds,
+      chat_list_ad_interval, chat_list_ad_free_first, chat_list_vip_ad_interval,
+      scroll_aware_enabled, chat_open_ad_enabled,
+      call_end_interstitial_cooldown_minutes, call_end_interstitial_min_calls,
+      settings_banner_enabled, coin_shop_rewarded_enabled,
+      exit_intent_enabled, exit_intent_chance_percent, exit_intent_vip_exempt, exit_intent_rage_exempt,
+      silent_rewarded_enabled, ad_free_minutes_coin_cost,
+      night_mode_start_hour, night_mode_end_hour, night_mode_dampen_percent
+    } = settings;
+
     // Risk assessment
     let risk = 'LOW';
     if (ads_enabled !== old.ads_enabled) risk = 'HIGH';
     if (active_network !== old.active_network) risk = 'MEDIUM';
-    if (test_mode === 0 && old.test_mode === 1) risk = 'HIGH'; // Production switch
+    if (test_mode === 0 && old.test_mode === 1) risk = 'HIGH';
 
     await run(`
       UPDATE ad_global_settings SET 
-        ads_enabled = $1, 
-        test_mode = $2, 
-        active_network = $3, 
-        fallback_network = $4, 
-        interstitial_gap_seconds = $5, 
-        native_refresh_seconds = $6,
+        ads_enabled = $1, test_mode = $2, active_network = $3, fallback_network = $4,
+        interstitial_gap_seconds = $5, native_refresh_seconds = $6,
+        chat_list_ad_interval = $7, chat_list_ad_free_first = $8, chat_list_vip_ad_interval = $9,
+        scroll_aware_enabled = $10, chat_open_ad_enabled = $11,
+        call_end_interstitial_cooldown_minutes = $12, call_end_interstitial_min_calls = $13,
+        settings_banner_enabled = $14, coin_shop_rewarded_enabled = $15,
+        exit_intent_enabled = $16, exit_intent_chance_percent = $17, exit_intent_vip_exempt = $18, exit_intent_rage_exempt = $19,
+        silent_rewarded_enabled = $20, ad_free_minutes_coin_cost = $21,
+        night_mode_start_hour = $22, night_mode_end_hour = $23, night_mode_dampen_percent = $24,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = 1
-    `, [ads_enabled, test_mode, active_network, fallback_network, interstitial_gap_seconds, native_refresh_seconds]);
-    
+    `, [
+      ads_enabled, test_mode, active_network, fallback_network,
+      interstitial_gap_seconds || 1800, native_refresh_seconds || 60,
+      chat_list_ad_interval || 10, chat_list_ad_free_first || 5, chat_list_vip_ad_interval || 15,
+      scroll_aware_enabled !== false, chat_open_ad_enabled !== false,
+      call_end_interstitial_cooldown_minutes || 30, call_end_interstitial_min_calls || 3,
+      settings_banner_enabled !== false, coin_shop_rewarded_enabled !== false,
+      exit_intent_enabled !== false, exit_intent_chance_percent || 30, exit_intent_vip_exempt !== false, exit_intent_rage_exempt !== false,
+      silent_rewarded_enabled !== false, ad_free_minutes_coin_cost || 50,
+      night_mode_start_hour || 23, night_mode_end_hour || 7, night_mode_dampen_percent || 80
+    ]);
+
     await adConfigService.logAudit(adminId, 'UPDATE_GLOBAL_SETTINGS', JSON.stringify(old), JSON.stringify(settings), 'GLOBAL', risk);
     return await adConfigService.getGlobalSettings();
   },
@@ -264,7 +287,43 @@ export const adConfigService = {
         native_refresh_seconds: global.native_refresh_seconds
       },
       placements: placementObj,
-      networks: networkObj
+      networks: networkObj,
+      chat_list: {
+        ad_interval: global.chat_list_ad_interval || 10,
+        ad_free_first: global.chat_list_ad_free_first || 5,
+        vip_ad_interval: global.chat_list_vip_ad_interval || 15,
+        scroll_aware: global.scroll_aware_enabled !== false
+      },
+      chat_open: {
+        enabled: global.chat_open_ad_enabled !== false
+      },
+      call_end: {
+        cooldown_minutes: global.call_end_interstitial_cooldown_minutes || 30,
+        min_calls: global.call_end_interstitial_min_calls || 3
+      },
+      settings_banner: {
+        enabled: global.settings_banner_enabled !== false
+      },
+      coin_shop: {
+        rewarded_enabled: global.coin_shop_rewarded_enabled !== false
+      },
+      exit_intent: {
+        enabled: global.exit_intent_enabled !== false,
+        chance_percent: global.exit_intent_chance_percent || 30,
+        vip_exempt: global.exit_intent_vip_exempt !== false,
+        rage_exempt: global.exit_intent_rage_exempt !== false
+      },
+      silent_rewarded: {
+        enabled: global.silent_rewarded_enabled !== false
+      },
+      economy: {
+        ad_free_minutes_coin_cost: global.ad_free_minutes_coin_cost || 50
+      },
+      night_mode: {
+        start_hour: global.night_mode_start_hour || 23,
+        end_hour: global.night_mode_end_hour || 7,
+        dampen_percent: global.night_mode_dampen_percent || 80
+      }
     };
   },
 
