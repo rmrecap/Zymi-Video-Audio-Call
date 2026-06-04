@@ -3,7 +3,7 @@ import { get, run, all } from '../db/postgres.js';
 export const logAudit = async (adminId, action, targetUserId, details, ipAddress = null) => {
   try {
     await run(
-      'INSERT INTO admin_audit_logs (admin_id, action, target_user_id, details, ip_address) VALUES ($1, $2, $3, $4, $5)',
+      'INSERT INTO admin_audit_logs (admin_id, action, target_user_id, details, ip_address, created_at) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)',
       [adminId, action, targetUserId, details, ipAddress]
     );
   } catch (err) {

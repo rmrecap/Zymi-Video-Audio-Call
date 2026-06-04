@@ -6,6 +6,10 @@ import UsersPage from './pages/UsersPage';
 import AuditPage from './pages/AuditPage';
 import FeaturesPage from './pages/FeaturesPage';
 import SettingsPage from './pages/SettingsPage';
+import MonetizationPage from './pages/MonetizationPage';
+import NearbyPage from './pages/NearbyPage';
+import PresencePage from './pages/PresencePage';
+import GatewayPage from './pages/GatewayPage';
 import Sidebar from './components/Sidebar';
 
 function ProtectedLayout({ children }) {
@@ -28,6 +32,10 @@ export default function App() {
       <Route path="/users" element={<ProtectedLayout><UsersPage /></ProtectedLayout>} />
       <Route path="/audit" element={<ProtectedLayout><AuditPage /></ProtectedLayout>} />
       <Route path="/features" element={<ProtectedLayout><FeaturesPage /></ProtectedLayout>} />
+      <Route path="/monetization" element={<ProtectedLayout><MonetizationPage /></ProtectedLayout>} />
+      <Route path="/nearby" element={<ProtectedLayout><NearbyPage /></ProtectedLayout>} />
+      <Route path="/presence" element={<ProtectedLayout><PresencePage /></ProtectedLayout>} />
+      <Route path="/gateway" element={<ProtectedLayout><GatewayPage /></ProtectedLayout>} />
       <Route path="/settings" element={<ProtectedLayout><SettingsPage /></ProtectedLayout>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

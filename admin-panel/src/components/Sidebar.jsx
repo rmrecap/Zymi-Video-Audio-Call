@@ -5,6 +5,10 @@ const navItems = [
   { to: '/users', label: 'Users', icon: '◉' },
   { to: '/audit', label: 'Audit & Security', icon: '⚠' },
   { to: '/features', label: 'Features & AI', icon: '⚙' },
+  { to: '/monetization', label: 'Monetization', icon: '💰' },
+  { to: '/nearby', label: 'Nearby Control', icon: '📍' },
+  { to: '/presence', label: 'Live Presence', icon: '📡' },
+  { to: '/gateway', label: 'Gateway', icon: '📧' },
   { to: '/settings', label: 'System Settings', icon: '⛭' },
 ];
 

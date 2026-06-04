@@ -187,8 +187,32 @@ export const runMigrations = async () => {
       timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // Add created_at column for compatibility with admin dashboard queries
+  try {
+    await exec('ALTER TABLE admin_audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP');
+    console.log('[MIGRATION] admin_audit_logs.created_at column verified');
+  } catch (e) {
+    console.warn('[MIGRATION] Could not add created_at to admin_audit_logs:', e.message);
+  }
   console.log('[MIGRATION] admin_audit_logs table ready');
  
+  // ─── SYSTEM SETTINGS (Hot-reload config store) ────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      settings_json JSONB NOT NULL DEFAULT '{}',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_by INTEGER
+    )
+  `);
+  // Ensure default row exists
+  await run(`
+    INSERT INTO system_settings (id, settings_json)
+    VALUES (1, '{}')
+    ON CONFLICT (id) DO NOTHING
+  `);
+  console.log('[MIGRATION] system_settings table ready');
+
   // ─── AUDIT LOGS (General/Policy ACK tracking) ─────────────────────────────
   await exec(`
     CREATE TABLE IF NOT EXISTS audit_logs (

@@ -138,7 +138,7 @@ export const getAudit = async (req, res) => {
       a.target_user_id,
       a.details,
       a.ip_address,
-      a.created_at as timestamp,
+      COALESCE(a.created_at, a.timestamp) as timestamp,
       u.username as admin_username,
       t.username as target_username
     FROM admin_audit_logs a
@@ -160,16 +160,16 @@ export const getAudit = async (req, res) => {
   }
 
   if (startDate) {
-    query += ` AND a.created_at >= $${paramIndex++}`;
+    query += ` AND COALESCE(a.created_at, a.timestamp) >= $${paramIndex++}`;
     params.push(startDate);
   }
 
   if (endDate) {
-    query += ` AND a.created_at <= $${paramIndex++}`;
+    query += ` AND COALESCE(a.created_at, a.timestamp) <= $${paramIndex++}`;
     params.push(endDate);
   }
 
-  query += ` ORDER BY a.created_at DESC LIMIT $${paramIndex++}`;
+  query += ` ORDER BY COALESCE(a.created_at, a.timestamp) DESC LIMIT $${paramIndex++}`;
   params.push(parseInt(limit));
 
   try {
