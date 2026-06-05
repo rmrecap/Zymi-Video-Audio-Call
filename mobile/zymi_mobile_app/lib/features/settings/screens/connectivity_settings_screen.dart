@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ConnectivitySettingsScreen extends StatefulWidget {
   const ConnectivitySettingsScreen({super.key});
@@ -57,7 +58,7 @@ class _ConnectivitySettingsScreenState
             ),
             value: _autoFixEnabled,
             onChanged: _toggleSetting,
-            activeThumbColor: Colors.blueAccent,
+            activeThumbColor: ZymiColors.primary,
           ),
           const Padding(
             padding: EdgeInsets.all(16.0),
@@ -68,7 +69,7 @@ class _ConnectivitySettingsScreenState
           ),
           _buildSectionHeader('Connection Health'),
           const ListTile(
-            leading: Icon(Icons.speed, color: Colors.blueAccent),
+            leading: Icon(Icons.speed, color: ZymiColors.primary),
             title: Text('Protocol Strategy',
                 style: TextStyle(color: Colors.white)),
             subtitle: Text('STUN-First, TURN-Fallback',
@@ -85,7 +86,7 @@ class _ConnectivitySettingsScreenState
       child: Text(
         title.toUpperCase(),
         style: const TextStyle(
-            color: Colors.blueAccent,
+            color: ZymiColors.primary,
             fontSize: 12,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.2),

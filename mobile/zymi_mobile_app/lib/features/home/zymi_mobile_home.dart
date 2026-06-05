@@ -8,6 +8,7 @@ import '../diagnostics/mobile_diagnostics_screen.dart';
 import '../../services/api/auth_service.dart';
 import '../verification/widgets/verification_status_bar.dart';
 import '../../core/navigation/zymi_routes.dart';
+import '../../core/theme/zymi_brand_colors.dart';
 import '../profile/screens/profile_screen.dart';
 import '../call/controllers/call_controller.dart';
 import '../call/screens/incoming_call_screen.dart';
@@ -124,10 +125,9 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-      backgroundColor: const Color(0xFF0f172a),
+      backgroundColor: ZymiColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: const Color(0xFF1e293b),
         title: Row(
           children: [
             const Text('ZYMI', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
@@ -177,9 +177,9 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
       ),
       body: _buildBody(),
       bottomNavigationBar: _localUserId == null ? null : BottomNavigationBar(
-        backgroundColor: const Color(0xFF1e293b),
-        selectedItemColor: Colors.blueAccent,
-        unselectedItemColor: Colors.white54,
+        backgroundColor: ZymiColors.surface,
+        selectedItemColor: ZymiColors.primary,
+        unselectedItemColor: ZymiColors.textMuted,
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
         onTap: (idx) => setState(() => _currentIndex = idx),

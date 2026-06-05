@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../../services/api/nearby_service.dart';
 import '../../../core/utils/location_utils.dart';
 import '../../../services/governance/policy_gate_service.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class NearbyScreen extends StatefulWidget {
   const NearbyScreen({super.key});
@@ -175,7 +176,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
               point: myLocation,
               width: 40,
               height: 40,
-              child: const Icon(Icons.my_location, color: Colors.blueAccent, size: 30),
+              child: const Icon(Icons.my_location, color: ZymiColors.primary, size: 30),
             ),
             // Nearby Users Markers
             ..._nearbyUsers.where((u) => u['lat'] != null && u['lng'] != null).map(
@@ -207,7 +208,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
           children: [
             CircleAvatar(
               radius: 30,
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: ZymiColors.primary,
               child: Text(user['username'][0].toUpperCase(), style: const TextStyle(fontSize: 24, color: Colors.white)),
             ),
             const SizedBox(height: 10),
@@ -216,7 +217,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+              style: ElevatedButton.styleFrom(backgroundColor: ZymiColors.primary),
               child: const Text('View Profile'),
             ),
           ],
@@ -239,7 +240,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: ZymiColors.primary,
               child: Text(user['username'][0].toUpperCase(), style: const TextStyle(color: Colors.white)),
             ),
             title: Text(user['username'], style: const TextStyle(color: Colors.white)),

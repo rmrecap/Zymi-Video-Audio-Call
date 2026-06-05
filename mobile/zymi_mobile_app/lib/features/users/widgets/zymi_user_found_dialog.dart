@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/navigation/zymi_routes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ZymiUserFoundDialog extends StatelessWidget {
   final String userId;
@@ -31,10 +32,10 @@ class ZymiUserFoundDialog extends StatelessWidget {
           const SizedBox(height: 16),
           CircleAvatar(
             radius: 40,
-            backgroundColor: Colors.blueAccent.withAlpha(50),
+            backgroundColor: ZymiColors.primary.withAlpha(50),
             child: avatar != null 
               ? ClipOval(child: Image.network(avatar!))
-              : const Icon(Icons.person, size: 40, color: Colors.blueAccent),
+              : const Icon(Icons.person, size: 40, color: ZymiColors.primary),
           ),
           const SizedBox(height: 16),
           Text(
@@ -64,7 +65,7 @@ class ZymiUserFoundDialog extends StatelessWidget {
             );
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blueAccent,
+            backgroundColor: ZymiColors.primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           child: const Text('Open Chat', style: TextStyle(color: Colors.white)),

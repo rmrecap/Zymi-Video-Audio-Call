@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../services/api/auth_service.dart';
 import '../../../core/navigation/zymi_routes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -56,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.security, size: 64, color: Colors.blueAccent),
+                  const Icon(Icons.security, size: 64, color: ZymiColors.primary),
                   const SizedBox(height: 24),
                   const Text(
                     'ZYMI',
@@ -135,8 +136,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.blueAccent,
-                      foregroundColor: Colors.white,
+                      backgroundColor: ZymiColors.primary,
+                      foregroundColor: const Color(0xFF0A0E1A),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

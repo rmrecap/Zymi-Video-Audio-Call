@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/api/auth_service.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -94,7 +95,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.lock_reset, size: 64, color: Colors.blueAccent),
+                  const Icon(Icons.lock_reset, size: 64, color: ZymiColors.primary),
                   const SizedBox(height: 24),
                   if (_error != null) ...[
                     Text(_error!, style: const TextStyle(color: Colors.redAccent), textAlign: TextAlign.center),
@@ -127,7 +128,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       onPressed: _isLoading ? null : _handleSendOTP,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.blueAccent,
+                        backgroundColor: ZymiColors.primary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: _isLoading ? const CircularProgressIndicator() : const Text('SEND CODE'),
@@ -165,7 +166,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       onPressed: _isLoading ? null : _handleResetPassword,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.blueAccent,
+                        backgroundColor: ZymiColors.primary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: _isLoading ? const CircularProgressIndicator() : const Text('RESET PASSWORD'),

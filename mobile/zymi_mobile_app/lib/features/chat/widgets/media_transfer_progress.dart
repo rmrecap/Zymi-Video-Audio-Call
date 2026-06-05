@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class MediaTransferProgress extends StatelessWidget {
   final String status;
@@ -14,7 +15,7 @@ class MediaTransferProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color color = Colors.blueAccent;
+    Color color = ZymiColors.primary;
     String label = 'Transferring...';
     bool showRetry = false;
 
@@ -24,7 +25,7 @@ class MediaTransferProgress extends StatelessWidget {
         label = isMine ? 'Waiting for receiver...' : 'Waiting for sender...';
         break;
       case 'transferring':
-        color = Colors.blueAccent;
+        color = ZymiColors.primary;
         label = 'Transferring...';
         break;
       case 'failed':
@@ -44,7 +45,7 @@ class MediaTransferProgress extends StatelessWidget {
               width: 12,
               height: 12,
               child: status == 'transferring' 
-                ? const CircularProgressIndicator(strokeWidth: 2, color: Colors.blueAccent)
+                ? const CircularProgressIndicator(strokeWidth: 2, color: ZymiColors.primary)
                 : Icon(Icons.info_outline, size: 12, color: color),
             ),
             const SizedBox(width: 8),
@@ -59,7 +60,7 @@ class MediaTransferProgress extends StatelessWidget {
                 onTap: onRetry,
                 child: const Text(
                   'Retry',
-                  style: TextStyle(color: Colors.blueAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: ZymiColors.primary, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ),
           ],
@@ -68,7 +69,7 @@ class MediaTransferProgress extends StatelessWidget {
           const SizedBox(height: 4),
           const LinearProgressIndicator(
             backgroundColor: Colors.white10,
-            color: Colors.blueAccent,
+            color: ZymiColors.primary,
             minHeight: 2,
           ),
         ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../services/api/auth_service.dart';
 import '../../../core/navigation/zymi_routes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ProfileVerificationScreen extends StatefulWidget {
   const ProfileVerificationScreen({super.key});
@@ -87,14 +88,14 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1e293b),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isVerified ? Colors.green.withValues(alpha: 0.3) : Colors.blueAccent.withValues(alpha: 0.3)),
+        border: Border.all(color: isVerified ? Colors.green.withValues(alpha: 0.3) : ZymiColors.primary.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: isVerified ? Colors.green : Colors.blueAccent, size: 32),
+              Icon(icon, color: isVerified ? Colors.green : ZymiColors.primary, size: 32),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -119,7 +120,7 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
             ElevatedButton(
               onPressed: onTap,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
+                backgroundColor: ZymiColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 minimumSize: const Size(double.infinity, 44),

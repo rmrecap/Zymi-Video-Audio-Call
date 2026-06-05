@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class VerificationStatusBar extends StatelessWidget {
   final int completionPercentage;
@@ -26,17 +27,17 @@ class VerificationStatusBar extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.blueAccent.withValues(alpha: 0.2),
+              ZymiColors.primary.withValues(alpha: 0.2),
               const Color(0xFF1e293b).withValues(alpha: 0.8),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
+          border: Border.all(color: ZymiColors.primary.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: Colors.blueAccent.withValues(alpha: 0.1),
+              color: ZymiColors.primary.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -59,7 +60,7 @@ class VerificationStatusBar extends StatelessWidget {
                 Text(
                   '$completionPercentage%',
                   style: const TextStyle(
-                    color: Colors.blueAccent,
+                    color: ZymiColors.primary,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -72,7 +73,7 @@ class VerificationStatusBar extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: completionPercentage / 100,
                 backgroundColor: Colors.white10,
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                valueColor: const AlwaysStoppedAnimation<Color>(ZymiColors.primary),
                 minHeight: 8,
               ),
             ),
@@ -86,12 +87,12 @@ class VerificationStatusBar extends StatelessWidget {
                 const Text(
                   'Complete Now',
                   style: TextStyle(
-                    color: Colors.blueAccent,
+                    color: ZymiColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.blueAccent, size: 16),
+                const Icon(Icons.chevron_right, color: ZymiColors.primary, size: 16),
               ],
             ),
           ],

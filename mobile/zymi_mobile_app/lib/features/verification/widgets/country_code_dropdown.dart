@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/data/country_codes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class CountryCodeDropdown extends StatelessWidget {
   final CountryCode? selectedCountry;
@@ -32,7 +33,7 @@ class CountryCodeDropdown extends StatelessWidget {
                 children: [
                   Text(c.iso, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
                   const SizedBox(width: 8),
-                  Text(c.code, style: const TextStyle(color: Colors.blueAccent)),
+                  Text(c.code, style: const TextStyle(color: ZymiColors.primary)),
                   const SizedBox(width: 8),
                   Text(c.name, style: const TextStyle(color: Colors.white)),
                 ],

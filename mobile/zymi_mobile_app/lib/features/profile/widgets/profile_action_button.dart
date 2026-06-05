@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ProfileActionButton extends StatelessWidget {
   final IconData icon;
@@ -24,15 +25,15 @@ class ProfileActionButton extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: (color ?? Colors.blueAccent).withValues(alpha: 0.1),
+              color: (color ?? ZymiColors.primary).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: color ?? Colors.blueAccent, size: 24),
+            child: Icon(icon, color: color ?? ZymiColors.primary, size: 24),
           ),
           const SizedBox(height: 8),
           Text(
             label,
-            style: TextStyle(color: (color ?? Colors.blueAccent).withValues(alpha: 0.8), fontSize: 12),
+            style: TextStyle(color: (color ?? ZymiColors.primary).withValues(alpha: 0.8), fontSize: 12),
           ),
         ],
       ),

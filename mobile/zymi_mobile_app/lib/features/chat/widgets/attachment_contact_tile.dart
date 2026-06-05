@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class AttachmentContactTile extends StatelessWidget {
   final String name;
@@ -19,12 +20,12 @@ class AttachmentContactTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       leading: CircleAvatar(
-        backgroundColor: Colors.blueAccent.withValues(alpha: 0.1),
+        backgroundColor: ZymiColors.primary.withValues(alpha: 0.1),
         backgroundImage: avatar != null ? NetworkImage(avatar!) : null,
         child: avatar == null
             ? Text(
                 name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: ZymiColors.primary, fontWeight: FontWeight.bold),
               )
             : null,
       ),
@@ -38,7 +39,7 @@ class AttachmentContactTile extends StatelessWidget {
               style: const TextStyle(color: Colors.white38, fontSize: 12),
             )
           : null,
-      trailing: const Icon(Icons.person_add_outlined, color: Colors.blueAccent, size: 20),
+      trailing: const Icon(Icons.person_add_outlined, color: ZymiColors.primary, size: 20),
     );
   }
 }

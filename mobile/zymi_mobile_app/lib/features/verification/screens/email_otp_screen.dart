@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/api/otp_service.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class EmailOtpScreen extends StatefulWidget {
   final String? initialEmail;
@@ -92,7 +93,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.mark_email_read, size: 64, color: Colors.blueAccent),
+                const Icon(Icons.mark_email_read, size: 64, color: ZymiColors.primary),
                 const SizedBox(height: 24),
                 if (_error != null) ...[
                   Text(_error!, style: const TextStyle(color: Colors.redAccent), textAlign: TextAlign.center),
@@ -114,7 +115,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                     onPressed: _isLoading ? null : _handleRequestOtp,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.blueAccent,
+                      backgroundColor: ZymiColors.primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: _isLoading ? const CircularProgressIndicator() : const Text('SEND OTP'),
@@ -143,7 +144,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> {
                     onPressed: _isLoading ? null : _handleVerifyOtp,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.blueAccent,
+                      backgroundColor: ZymiColors.primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: _isLoading ? const CircularProgressIndicator() : const Text('VERIFY EMAIL'),

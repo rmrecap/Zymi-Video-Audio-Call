@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/navigation/zymi_routes.dart';
 import 'core/runtime/app_lifecycle_handler.dart';
+import 'core/theme/zymi_brand_colors.dart';
 import 'services/api/auth_service.dart';
 import 'services/realtime/background_socket_service.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -56,11 +57,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'ZYMI',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.blueAccent,
-        scaffoldBackgroundColor: const Color(0xFF0f172a),
-      ),
+      theme: ZymiTheme.dark,
       onGenerateRoute: ZymiRoutes.onGenerateRoute,
       initialRoute: initialRoute,
     );

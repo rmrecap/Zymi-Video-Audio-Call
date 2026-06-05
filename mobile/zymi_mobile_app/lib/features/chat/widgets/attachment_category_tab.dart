@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class AttachmentCategoryTab extends StatelessWidget {
   final IconData icon;
@@ -22,7 +23,7 @@ class AttachmentCategoryTab extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blueAccent.withValues(alpha: 0.1) : Colors.transparent,
+          color: isSelected ? ZymiColors.primary.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -30,14 +31,14 @@ class AttachmentCategoryTab extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.blueAccent : Colors.white54,
+              color: isSelected ? ZymiColors.primary : Colors.white54,
               size: 24,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.blueAccent : Colors.white38,
+                color: isSelected ? ZymiColors.primary : Colors.white38,
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),

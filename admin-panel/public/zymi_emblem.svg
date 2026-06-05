@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Outer hexagon glow layer -->
+  <polygon points="256,30 446,143 446,369 256,482 66,369 66,143"
+           stroke="#00f0ff" stroke-width="3" opacity="0.15"/>
+  <!-- Main hexagon ring -->
+  <polygon points="256,44 436,150 436,362 256,468 76,362 76,150"
+           stroke="#00f0ff" stroke-width="10" stroke-linejoin="round"/>
+  <!-- Inner hexagon accent -->
+  <polygon points="256,66 418,160 418,352 256,446 94,352 94,160"
+           stroke="#00f0ff" stroke-width="2" stroke-linejoin="round" opacity="0.35"/>
+  <!-- Stylized Z stroke -->
+  <polyline points="168,172 344,172 168,340 344,340"
+            stroke="#00f0ff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Connection node top-right -->
+  <circle cx="344" cy="172" r="16" fill="#0a0e1a" stroke="#00f0ff" stroke-width="6"/>
+  <!-- Connection node bottom-left -->
+  <circle cx="168" cy="340" r="16" fill="#0a0e1a" stroke="#00f0ff" stroke-width="6"/>
+  <!-- Center data pulse -->
+  <circle cx="256" cy="256" r="6" fill="#00f0ff" opacity="0.5"/>
+</svg>

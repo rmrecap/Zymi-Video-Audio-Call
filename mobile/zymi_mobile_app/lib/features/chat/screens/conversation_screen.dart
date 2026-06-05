@@ -6,6 +6,7 @@ import '../widgets/offline_sync_banner.dart';
 import '../widgets/media_message_bubble.dart';
 import '../widgets/attachment_hub_sheet.dart';
 import '../../../core/navigation/zymi_routes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String peerId;
@@ -94,7 +95,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.call_outlined, color: Colors.blueAccent),
+            icon: const Icon(Icons.call_outlined, color: ZymiColors.primary),
             onPressed: () {
                Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
                  'peerId': widget.peerId,
@@ -104,7 +105,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.videocam_outlined, color: Colors.blueAccent),
+            icon: const Icon(Icons.videocam_outlined, color: ZymiColors.primary),
             onPressed: () {
                Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
                  'peerId': widget.peerId,
@@ -259,7 +260,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 ? Container(
                     key: const ValueKey('send'),
                     decoration: const BoxDecoration(
-                      color: Colors.blueAccent,
+                      color: ZymiColors.primary,
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
@@ -272,7 +273,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice recording coming soon')));
                     },
-                    icon: const Icon(Icons.mic_none_outlined, color: Colors.blueAccent),
+                    icon: const Icon(Icons.mic_none_outlined, color: ZymiColors.primary),
                   ),
           ),
         ],

@@ -4,6 +4,7 @@ import '../../../services/api/profile_service.dart';
 import '../../../services/api/auth_service.dart';
 import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/widgets/skeleton_placeholder.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -114,7 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(colors: [Colors.blueAccent, Colors.purpleAccent]),
+                gradient: LinearGradient(colors: [ZymiColors.primary, ZymiColors.purple]),
               ),
               child: CircleAvatar(
                 radius: 60,
@@ -138,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
                 child: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(color: ZymiColors.primary, shape: BoxShape.circle),
                   child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                 ),
               ),
@@ -230,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () => _copyToClipboard(_profile?['phone_normalized'] ?? 'Not set'),
             child: Row(
               children: [
-                const Icon(Icons.phone_android, size: 18, color: Colors.blueAccent),
+                const Icon(Icons.phone_android, size: 18, color: ZymiColors.primary),
                 const SizedBox(width: 12),
                 Text(
                   _profile?['phone_normalized'] ?? 'Not set',
@@ -268,14 +269,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text('Profile Completion', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-            Text('$completion%', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+            Text('$completion%', style: const TextStyle(color: ZymiColors.primary, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 12),
         LinearProgressIndicator(
           value: completion / 100,
           backgroundColor: Colors.white10,
-          valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+          valueColor: const AlwaysStoppedAnimation<Color>(ZymiColors.primary),
           borderRadius: BorderRadius.circular(10),
           minHeight: 8,
         ),
@@ -285,9 +286,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.security, size: 18),
           label: const Text('VERIFICATION CENTER'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blueAccent.withValues(alpha: 0.1),
-            foregroundColor: Colors.blueAccent,
-            side: const BorderSide(color: Colors.blueAccent, width: 0.5),
+            backgroundColor: ZymiColors.primary.withValues(alpha: 0.1),
+            foregroundColor: ZymiColors.primary,
+            side: const BorderSide(color: ZymiColors.primary, width: 0.5),
             minimumSize: const Size(double.infinity, 44),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),

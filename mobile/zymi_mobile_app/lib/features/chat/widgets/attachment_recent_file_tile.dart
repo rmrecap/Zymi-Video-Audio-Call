@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class AttachmentRecentFileTile extends StatelessWidget {
   final String fileName;
@@ -27,7 +28,7 @@ class AttachmentRecentFileTile extends StatelessWidget {
       case 'doc':
       case 'docx':
         fileIcon = Icons.description;
-        iconColor = Colors.blueAccent;
+        iconColor = ZymiColors.primary;
         break;
       case 'zip':
       case 'rar':

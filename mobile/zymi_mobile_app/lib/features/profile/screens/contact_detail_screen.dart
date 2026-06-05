@@ -4,6 +4,7 @@ import '../widgets/profile_action_button.dart';
 import '../widgets/profile_media_tabs.dart';
 import '../widgets/profile_overflow_menu.dart';
 import '../../../core/navigation/zymi_routes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ContactDetailScreen extends StatefulWidget {
   final String userId;
@@ -176,7 +177,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
       onTap: onTap,
       child: Row(
         children: [
-          Icon(icon, color: Colors.blueAccent, size: 20),
+          Icon(icon, color: ZymiColors.primary, size: 20),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

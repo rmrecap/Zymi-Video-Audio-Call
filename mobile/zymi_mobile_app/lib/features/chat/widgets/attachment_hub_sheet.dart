@@ -4,6 +4,7 @@ import 'attachment_recent_file_tile.dart';
 import 'attachment_contact_tile.dart';
 import 'attachment_location_tile.dart';
 import 'attachment_music_tile.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class AttachmentHubSheet extends StatefulWidget {
   final Function(String path, String type) onMediaSelected;
@@ -215,7 +216,7 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.checklist_rtl, color: Colors.blueAccent, size: 48),
+          const Icon(Icons.checklist_rtl, color: ZymiColors.primary, size: 48),
           const SizedBox(height: 16),
           const Text(
             'Create Checklist',
@@ -234,7 +235,7 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
                Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: ZymiColors.primary,
               minimumSize: const Size(200, 48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),

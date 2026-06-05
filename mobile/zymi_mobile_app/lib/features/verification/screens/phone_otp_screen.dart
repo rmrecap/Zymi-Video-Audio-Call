@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../services/api/otp_service.dart';
 import '../widgets/country_code_dropdown.dart';
 import '../../../core/data/country_codes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class PhoneOtpScreen extends StatefulWidget {
   const PhoneOtpScreen({super.key});
@@ -181,10 +182,10 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.blueAccent.withValues(alpha: 0.1),
+            color: ZymiColors.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.phonelink_lock, size: 64, color: Colors.blueAccent),
+          child: const Icon(Icons.phonelink_lock, size: 64, color: ZymiColors.primary),
         ),
         const SizedBox(height: 24),
         const Text(
@@ -251,7 +252,7 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
           onPressed: _isLoading ? null : _handleGenerateOtp,
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            backgroundColor: Colors.blueAccent,
+            backgroundColor: ZymiColors.primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
           ),
@@ -276,10 +277,10 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.blueAccent.withValues(alpha: 0.2), Colors.purpleAccent.withValues(alpha: 0.1)],
+                colors: [ZymiColors.primary.withValues(alpha: 0.2), Colors.purpleAccent.withValues(alpha: 0.1)],
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
+              border: Border.all(color: ZymiColors.primary.withValues(alpha: 0.3)),
             ),
             child: Column(
               children: [

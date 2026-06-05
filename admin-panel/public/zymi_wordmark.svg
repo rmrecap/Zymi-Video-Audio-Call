@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" fill="none">
+  <!-- ZYMI Wordmark -->
+  <text x="200" y="72" text-anchor="middle" font-family="'JetBrains Mono', 'Fira Code', monospace"
+        font-size="60" font-weight="bold" letter-spacing="4" fill="#00f0ff">
+    ZYMI
+  </text>
+  <!-- Neon accent underline -->
+  <line x1="80" y1="92" x2="320" y2="92" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+  <!-- Accent dot -->
+  <circle cx="324" cy="92" r="4" fill="#00f0ff"/>
+</svg>

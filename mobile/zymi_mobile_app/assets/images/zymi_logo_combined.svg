@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" fill="none">
+  <g transform="translate(10, 15) scale(0.28)">
+    <polygon points="256,40 443,148 443,364 256,472 69,364 69,148"
+             stroke="#00f0ff" stroke-width="3" opacity="0.15"/>
+    <polygon points="256,54 433,156 433,356 256,458 79,356 79,156"
+             stroke="#00f0ff" stroke-width="10" stroke-linejoin="round"/>
+    <polygon points="256,74 420,168 420,344 256,438 92,344 92,168"
+             stroke="#00f0ff" stroke-width="2" stroke-linejoin="round" opacity="0.35"/>
+    <polyline points="170,177 342,177 170,335 342,335"
+              stroke="#00f0ff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="342" cy="177" r="15" fill="#0F172A" stroke="#00f0ff" stroke-width="5"/>
+    <circle cx="170" cy="335" r="15" fill="#0F172A" stroke="#00f0ff" stroke-width="5"/>
+    <circle cx="256" cy="256" r="5" fill="#00f0ff" opacity="0.5"/>
+  </g>
+  <text x="195" y="125" font-family="'JetBrains Mono', 'Fira Code', monospace"
+        font-size="64" font-weight="bold" letter-spacing="4" fill="#00f0ff">
+    ZYMI
+  </text>
+  <line x1="195" y1="148" x2="415" y2="148" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="419" cy="148" r="3.5" fill="#00f0ff"/>
+</svg>

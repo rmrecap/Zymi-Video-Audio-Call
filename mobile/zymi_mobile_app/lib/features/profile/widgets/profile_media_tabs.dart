@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 
 class ProfileMediaTabs extends StatelessWidget {
   final String userId;
@@ -14,8 +15,8 @@ class ProfileMediaTabs extends StatelessWidget {
           const TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            indicatorColor: Colors.blueAccent,
-            labelColor: Colors.blueAccent,
+            indicatorColor: ZymiColors.primary,
+            labelColor: ZymiColors.primary,
             unselectedLabelColor: Colors.white54,
             dividerColor: Colors.white10,
             tabs: [

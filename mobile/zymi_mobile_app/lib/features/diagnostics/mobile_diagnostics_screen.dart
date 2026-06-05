@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/realtime/zymi_socket_client.dart';
 import '../call/controllers/call_controller.dart';
 import '../../core/runtime/app_runtime_state.dart';
+import '../../core/theme/zymi_brand_colors.dart';
 
 class MobileDiagnosticsScreen extends StatefulWidget {
   const MobileDiagnosticsScreen({super.key});
@@ -76,7 +77,7 @@ class _MobileDiagnosticsScreenState extends State<MobileDiagnosticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+          Text(title, style: const TextStyle(color: ZymiColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
           const Divider(color: Colors.white24, height: 24),
           ...children,
         ],
