@@ -4,7 +4,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'zymi_socket_config.dart';
 import 'zymi_call_event_guard.dart';
 
-enum ZymiSocketStatus { connected, disconnected, connecting, error }
+enum ZymiSocketStatus { connected, disconnected, connecting, error, authError }
 
 class ZymiSocketClient {
   static final ZymiSocketClient _instance = ZymiSocketClient._internal();
@@ -35,7 +35,17 @@ class ZymiSocketClient {
 
     _socket!.onConnectError((err) {
       debugPrint('[SOCKET] Connect Error: $err');
+      final msg = err.toString().toLowerCase();
+      if (msg.contains('invalid token') || msg.contains('token expired') || msg.contains('authentication required')) {
+        _statusController.add(ZymiSocketStatus.authError);
+        return;
+      }
       _statusController.add(ZymiSocketStatus.error);
+    });
+
+    _socket!.on('force-logout', (data) {
+      debugPrint('[SOCKET] Force logout: $data');
+      _statusController.add(ZymiSocketStatus.authError);
     });
 
     _socket!.connect();

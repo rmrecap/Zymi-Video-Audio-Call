@@ -34,8 +34,14 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
   @override
   void initState() {
     super.initState();
-    _socketSub = _socketClient.statusStream.listen((_) {
-      if (mounted) setState(() {});
+    _socketSub = _socketClient.statusStream.listen((status) {
+      if (!mounted) return;
+      if (status == ZymiSocketStatus.authError) {
+        _authService.logout();
+        Navigator.pushReplacementNamed(context, ZymiRoutes.login);
+        return;
+      }
+      setState(() {});
     });
     _callController.addListener(_handleCallStateChange);
     _initAuthAndSocket();
@@ -66,7 +72,10 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
           _user = user;
           _localUserId = user['id'].toString();
         });
-        _socketClient.connect(_localUserId!);
+        final token = await _authService.getToken();
+        if (token != null) {
+          _socketClient.connect(token);
+        }
         return;
       }
     } catch (e) {

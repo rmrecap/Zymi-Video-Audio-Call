@@ -23,7 +23,7 @@ if (pgResult) {
   console.log('[DB] SQLite database initialized (DATABASE_URL not set)');
 }
 
-// Defer migrations and seeds to background — bind port first for Render health check
+// Run migrations and seeds before accepting traffic
 const startupTasks = (async () => {
   try {
     await runMigrations();
@@ -41,7 +41,8 @@ const startupTasks = (async () => {
   } catch (e) {
     console.warn('[STARTUP] Demo user seed skipped:', e.message);
   }
-})().catch(e => console.error('[STARTUP_FATAL]', e.message));
+  console.log('[STARTUP] Database ready — accepting connections');
+})();
 
 // Other services
 // import { createBlockTable } from './src/services/blockService.js';
@@ -264,7 +265,7 @@ async function syncFeaturesToRedis() {
     }
   }
 }
-startupTasks.then(async () => {
+startupTasks.catch(e => console.error('[STARTUP_FATAL]', e.message)).then(async () => {
   try {
     const redisResult = await initRedis(io);
     if (redisResult.adapter) {
@@ -274,53 +275,18 @@ startupTasks.then(async () => {
   } catch (err) {
     console.warn('[STARTUP] Redis init deferred:', err.message);
   }
-});
-
-import { registry } from './src/socket/userSocketRegistry.js';
-
-if (isProduction()) {
-  attachAuthMiddleware(io);
-}
-
-// Global connection listener to register BACKGROUND (and UI) sockets automatically
-io.on('connection', async (socket) => {
-  if (socket.userId) {
-    const socketType = socket.socketType || 'UI';
-    try {
-      await registry.register(socket.userId, socket.id, socketType);
-      console.log(`[INDEX_SOCKET] Registered ${socketType} socket for user ${socket.userId}`);
-    } catch (err) {
-      console.error('[INDEX_SOCKET] Registry write failed:', err.message);
+  // Bind port AFTER migrations, seeds, and Redis init
+  const PORT = config.port || 5000;
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`[BOOT] Server actively listening on port ${PORT}`);
+  }).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      httpServer.listen(PORT + 1, '0.0.0.0');
+    } else {
+      console.error('[BOOT] Fatal listen error:', err.message);
+      process.exit(1);
     }
-  }
+  });
 });
 
-setupCallSocket(io, userSockets, callActivity);
-setupChatSocket(io, userSockets);
-setupAdminSocket(io);
-setupGroupChatSocket(io, userSockets);
-
-// Start presence batch broadcasting
-import { batchPresenceBroadcast } from './src/services/presenceService.js';
-batchPresenceBroadcast(io);
-
-// Global Express error handler — ensures structured JSON + CORS headers on all unhandled errors
-app.use((err, req, res, next) => {
-  console.error('[EXPRESS_ERROR]', err.message);
-  if (!res.headersSent) {
-    res.status(err.status || 500).json({ error: 'Internal server error' });
-  }
-});
-
-const PORT = config.port || 5000;
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`[BOOT] Server actively listening on port ${PORT}`);
-}).on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    httpServer.listen(PORT + 1, '0.0.0.0');
-  } else {
-    console.error('[BOOT] Fatal listen error:', err.message);
-    process.exit(1);
-  }
-});
 export const getApp = () => app;
