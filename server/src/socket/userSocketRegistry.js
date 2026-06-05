@@ -1,5 +1,6 @@
 import { getRedisClient } from './redisAdapter.js';
 import Redlock from 'redlock';
+import { get, all, run } from '../db/postgres.js';
 
 class UserSocketRegistry {
   constructor() {
@@ -48,6 +49,7 @@ class UserSocketRegistry {
         this.localMap.set(normalizedUserId, {});
       }
       this.localMap.get(normalizedUserId)[type] = value;
+      this._pgSave(normalizedUserId, type, value);
     }
   }
 
@@ -90,6 +92,7 @@ class UserSocketRegistry {
           this.localMap.delete(normalizedUserId);
         }
       }
+      this._pgDelete(normalizedUserId, type);
     }
   }
 
@@ -104,6 +107,7 @@ class UserSocketRegistry {
       await client.del(`${this.keyPrefix}${normalizedUserId}`);
     } else {
       this.localMap.delete(normalizedUserId);
+      await run('DELETE FROM user_socket_registry WHERE user_id = $1', [normalizedUserId]);
     }
     console.log(`[REGISTRY] Purged all sockets for user ${normalizedUserId}`);
   }
@@ -155,6 +159,59 @@ class UserSocketRegistry {
       if (cleanupCount > 0) {
         console.log(`[REAPER] Telemetry: reaper_cleanup_count=${cleanupCount}`);
       }
+    }
+  }
+
+  /**
+   * Persist a socket entry to PostgreSQL when Redis is unavailable.
+   */
+  async _pgSave(userId, type, value) {
+    try {
+      await run(
+        `INSERT INTO user_socket_registry (user_id, socket_type, data, updated_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id, socket_type)
+         DO UPDATE SET data = $3, updated_at = CURRENT_TIMESTAMP`,
+        [userId, type, value]
+      );
+    } catch (err) {
+      console.warn('[REGISTRY] PG save failed:', err.message);
+    }
+  }
+
+  /**
+   * Remove a socket entry from PostgreSQL when Redis is unavailable.
+   */
+  async _pgDelete(userId, type) {
+    try {
+      await run(
+        'DELETE FROM user_socket_registry WHERE user_id = $1 AND socket_type = $2',
+        [userId, type]
+      );
+    } catch (err) {
+      console.warn('[REGISTRY] PG delete failed:', err.message);
+    }
+  }
+
+  /**
+   * Load all socket entries from PostgreSQL on startup (Redis fallback).
+   * Called once during server boot to restore session state.
+   */
+  async pgRestoreAll() {
+    try {
+      const rows = await all('SELECT * FROM user_socket_registry');
+      for (const row of rows) {
+        const uid = String(row.user_id);
+        if (!this.localMap.has(uid)) {
+          this.localMap.set(uid, {});
+        }
+        this.localMap.get(uid)[row.socket_type] = row.data;
+      }
+      console.log(`[REGISTRY] Restored ${rows.length} socket entries from PostgreSQL fallback`);
+      return rows.length;
+    } catch (err) {
+      console.warn('[REGISTRY] PG restore failed:', err.message);
+      return 0;
     }
   }
 }

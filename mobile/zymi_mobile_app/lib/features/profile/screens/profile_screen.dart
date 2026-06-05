@@ -88,19 +88,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0f172a),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            _buildAvatarSection(),
-            const SizedBox(height: 32),
-            _buildInfoCard(),
-            const SizedBox(height: 24),
-            _buildVerificationSection(),
-            const SizedBox(height: 32),
-            _buildActionButtons(),
-          ],
+      backgroundColor: ZymiColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              _buildAvatarSection(),
+              const SizedBox(height: 32),
+              _buildInfoCard(),
+              const SizedBox(height: 24),
+              _buildVerificationSection(),
+              const SizedBox(height: 32),
+              _buildActionButtons(),
+            ],
+          ),
         ),
       ),
     );

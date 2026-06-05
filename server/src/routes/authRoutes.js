@@ -45,7 +45,7 @@ export const login = async (req, res) => {
 
   try {
     console.log('[AUTH] Querying database for user...');
-    const user = await get('SELECT * FROM users WHERE username = $1 OR email = $2', username, username);
+    const user = await get('SELECT * FROM users WHERE username = $1 OR email = $1', username);
     
     if (!user) {
       console.log('[AUTH] User not found');
@@ -54,7 +54,16 @@ export const login = async (req, res) => {
 
     console.log('[AUTH] User found, verifying password...');
     const storedHash = user.password_hash || user.password;
-    if (!storedHash || !bcrypt.compareSync(password, storedHash)) {
+    if (!storedHash) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    let hashToCompare = storedHash;
+    if (hashToCompare.startsWith('$2b$')) {
+      hashToCompare = '$2a$' + hashToCompare.slice(4);
+    }
+
+    if (!bcrypt.compareSync(password, hashToCompare)) {
       console.log('[AUTH] Password mismatch');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -157,8 +166,8 @@ export const adminLogin = async (req, res) => {
     }
 
     const userRow = await get(
-      'SELECT * FROM users WHERE (username = $1 OR email = $2)',
-      username, username
+      'SELECT * FROM users WHERE (username = $1 OR email = $1)',
+      username
     );
 
     console.log('[LEGACY_AUTH_DEBUG] Raw DB Row Fetched:', userRow ? { id: userRow.id, email: userRow.email } : 'NULL');
