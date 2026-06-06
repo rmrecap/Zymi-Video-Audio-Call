@@ -6,6 +6,8 @@ import '../call/call_placeholder_screen.dart';
 import '../nearby/screens/nearby_screen.dart';
 import '../diagnostics/mobile_diagnostics_screen.dart';
 import '../../services/api/auth_service.dart';
+import '../../services/api/nearby_service.dart';
+import '../../core/utils/location_utils.dart';
 import '../verification/widgets/verification_status_bar.dart';
 import '../../core/navigation/zymi_routes.dart';
 import '../../core/theme/zymi_brand_colors.dart';
@@ -13,6 +15,7 @@ import '../profile/screens/profile_screen.dart';
 import '../call/controllers/call_controller.dart';
 import '../call/screens/incoming_call_screen.dart';
 import '../../core/widgets/skeleton_placeholder.dart';
+import '../chat/widgets/user_search_delegate.dart';
 
 class ZymiMobileHome extends StatefulWidget {
   const ZymiMobileHome({super.key});
@@ -76,6 +79,8 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
         if (token != null) {
           _socketClient.connect(token);
         }
+        // Fire-and-forget location update so the user appears on nearby discovery
+        _updateLocation();
         return;
       }
     } catch (e) {
@@ -84,6 +89,19 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
     // Not authenticated or network error — redirect to login
     if (mounted) {
       Navigator.pushReplacementNamed(context, ZymiRoutes.login);
+    }
+  }
+
+  Future<void> _updateLocation() async {
+    try {
+      final pos = await LocationUtils.getCurrentPosition();
+      if (pos != null) {
+        final nearbyService = NearbyService();
+        await nearbyService.updateLocation(pos.latitude, pos.longitude);
+        debugPrint('[HOME] Location updated for nearby discovery');
+      }
+    } catch (e) {
+      debugPrint('[HOME] Location update skipped: $e');
     }
   }
 
@@ -168,6 +186,10 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
                   ],
                 ),
               ),
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => showSearch(context: context, delegate: UserSearchDelegate()),
+            ),
             IconButton(
               icon: const Icon(Icons.notifications_none),
               onPressed: () => Navigator.pushNamed(context, ZymiRoutes.notifications),

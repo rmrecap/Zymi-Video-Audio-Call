@@ -1,10 +1,35 @@
 import { Router } from 'express';
-import { get } from '../db/postgres.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
+import { get, all } from '../db/postgres.js';
 import { normalizePhone } from '../utils/phoneNormalizer.js';
 import { rateLimitMiddleware } from '../middleware/rateLimit.js';
 import { logAudit } from '../services/auditService.js';
 
 const router = Router();
+
+// GET /api/users/search?q=username — partial text search (ILIKE)
+router.get('/search', requireAuth, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || String(q).trim().length < 1) {
+      return res.json([]);
+    }
+    const query = String(q).trim();
+    const pattern = `%${query}%`;
+    const users = await all(
+      `SELECT id, username, avatar
+       FROM users
+       WHERE username ILIKE $1
+          OR email ILIKE $1
+       LIMIT 20`,
+      [pattern]
+    );
+    res.json(users);
+  } catch (err) {
+    console.error('[SEARCH] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Phone lookup rate limit: 10 requests per minute
 const lookupRateLimit = rateLimitMiddleware({

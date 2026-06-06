@@ -36,9 +36,9 @@ class _NearbyScreenState extends State<NearbyScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
-    final pos = await LocationUtils.getCurrentPosition();
-    if (pos != null) {
-      try {
+    try {
+      final pos = await LocationUtils.getCurrentPosition();
+      if (pos != null) {
         final users = await _nearbyService.getNearbyUsers(pos.latitude, pos.longitude);
         if (mounted) {
           setState(() {
@@ -47,19 +47,19 @@ class _NearbyScreenState extends State<NearbyScreen> {
             _isLoading = false;
           });
         }
-      } catch (e) {
+      } else {
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _errorMessage = 'Failed to load nearby users. Pull to retry.';
+            _errorMessage = 'Location permission denied or disabled. Enable location to find nearby users.';
           });
         }
       }
-    } else {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Location permission denied or disabled. Enable location to find nearby users.';
+          _errorMessage = 'Could not get location. Enable GPS and try again.';
         });
       }
     }

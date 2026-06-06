@@ -29,4 +29,24 @@ class NearbyService {
     }
     return [];
   }
+
+  Future<bool> updateLocation(double lat, double lng) async {
+    final token = await _authService.getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiUrl}/api/nearby/update-location'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updating location: $e');
+      return false;
+    }
+  }
 }
