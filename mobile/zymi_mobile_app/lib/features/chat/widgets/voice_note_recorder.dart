@@ -1,6 +1,5 @@
-import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../services/voice_recorder_service.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
 import '../../../services/api/auth_service.dart';
@@ -85,7 +84,7 @@ class _VoiceNoteRecorderState extends State<VoiceNoteRecorder>
       final streamed = await request.send();
       if (streamed.statusCode == 200) {
         final body = await streamed.stream.bytesToString();
-        final data = Map<String, dynamic>.from(body is String ? {} : body);
+        final data = jsonDecode(body) as Map<String, dynamic>;
         return data['url'];
       }
     } catch (e) {
@@ -142,7 +141,7 @@ class _VoiceNoteRecorderState extends State<VoiceNoteRecorder>
               children: [
                 _roundButton(Icons.close, ZymiColors.textMuted, () async {
                   await _service.cancelRecording();
-                  Navigator.pop(context);
+                  if (mounted) Navigator.pop(context);
                 }),
                 _roundButton(Icons.check, ZymiColors.success, _stopAndSend),
               ],
