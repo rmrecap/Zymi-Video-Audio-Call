@@ -20,7 +20,9 @@ export const SOCKET_EVENTS = {
   USER_OFFLINE: 'user-offline',
   BANNED: 'banned',
   CALL_FAILED: 'call-failed',
-  MESSAGE_SEEN: 'message-seen'
+  MESSAGE_SEEN: 'message-seen',
+  FRIEND_REQUEST: 'friend-request-received',
+  FRIEND_RESPONSE: 'friend-request-response'
 };
 
 export const ADMIN_SOCKET_EVENTS = {

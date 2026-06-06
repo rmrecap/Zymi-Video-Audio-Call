@@ -89,9 +89,9 @@ export const runMigrations = async () => {
   if (!(await indexExists('idx_users_email'))) {
     await exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL');
   }
-  // if (!(await indexExists('idx_users_location'))) {
-  //   await exec('CREATE INDEX IF NOT EXISTS idx_users_location ON users USING GIST(location)');
-  // }
+  if (!(await indexExists('idx_users_location'))) {
+    await exec('CREATE INDEX IF NOT EXISTS idx_users_location ON users USING GIST(location)');
+  }
   console.log('[MIGRATION] users table ready');
   
   // Ensure necessary columns exist
@@ -758,6 +758,20 @@ export const runMigrations = async () => {
   `);
   console.log('[MIGRATION] blocked_users table ready');
 
+  // ─── FRIENDSHIPS ──────────────────────────────────────────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS friendships (
+      id SERIAL PRIMARY KEY,
+      requester_id INTEGER NOT NULL REFERENCES users(id),
+      addressee_id INTEGER NOT NULL REFERENCES users(id),
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(requester_id, addressee_id)
+    )
+  `);
+  console.log('[MIGRATION] friendships table ready');
+
   // ─── MESSAGE REPORTS ──────────────────────────────────────────────────────
   await exec(`
     CREATE TABLE IF NOT EXISTS message_reports (
@@ -994,7 +1008,7 @@ export const runMigrations = async () => {
 export const getMigrationStatus = async () => {
   const tableNames = [
     'users', 'messages', 'admin_audit_logs', 'call_history',
-    'blocked_users', 'message_reports', 'feature_flags',
+    'blocked_users', 'friendships', 'message_reports', 'feature_flags',
     'otp_tokens', 'turn_servers', 'relay_usage_stats'
   ];
 

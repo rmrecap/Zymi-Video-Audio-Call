@@ -57,17 +57,27 @@ router.get('/users', requireAuth, sessionGuard, async (req, res) => {
     }
 
     // Using PostGIS for high-performance proximity search as defined in ddl.sql (idx_users_location)
-    // We filter out the current user and banned users
+    // We filter out the current user, banned users, invisible users, and blocked pairs
     const nearbyUsers = await all(`
       SELECT 
-        id, username, avatar_url as avatar, 
-        ST_X(location::geometry) as lng, 
-        ST_Y(location::geometry) as lat,
-        ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) as distance_meters
-      FROM users
-      WHERE id != $3
-      AND is_banned = FALSE
-      AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($1, $2), 4326), $4)
+        u.id, u.username, u.avatar, 
+        ST_X(u.location::geometry) as lng, 
+        ST_Y(u.location::geometry) as lat,
+        ST_Distance(u.location, ST_SetSRID(ST_MakePoint($1, $2), 4326)) as distance_meters
+      FROM users u
+      LEFT JOIN nearby_visibility nv ON nv.user_id = u.id
+      LEFT JOIN user_location_preferences ulp ON ulp.user_id = u.id
+      WHERE u.id != $3
+      AND u.is_banned = FALSE
+      AND (nv.is_active IS NULL OR nv.is_active = TRUE)
+      AND (ulp.discovery_enabled IS NULL OR ulp.discovery_enabled = TRUE)
+      AND u.location IS NOT NULL
+      AND ST_DWithin(u.location, ST_SetSRID(ST_MakePoint($1, $2), 4326), $4)
+      AND u.id NOT IN (
+        SELECT blocked_id FROM blocked_users WHERE blocker_id = $3
+        UNION
+        SELECT blocker_id FROM blocked_users WHERE blocked_id = $3
+      )
       ORDER BY distance_meters ASC
     `, lng || 0, lat || 0, req.user.id, radiusMeters);
 
@@ -127,6 +137,21 @@ router.post('/update-location', requireAuth, sessionGuard, async (req, res) => {
           last_location_update = NOW()
       WHERE id = $3
     `, lng, lat, req.user.id);
+
+    // Ensure nearby_visibility row exists
+    await run(`
+      INSERT INTO nearby_visibility (user_id, lat, lng, is_active, last_seen)
+      VALUES ($1, $2, $3, TRUE, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        lat = $2, lng = $3, is_active = TRUE, last_seen = NOW()
+    `, req.user.id, lat, lng);
+
+    // Ensure user_location_preferences row exists
+    await run(`
+      INSERT INTO user_location_preferences (user_id, discovery_enabled, radius_km)
+      VALUES ($1, TRUE, 10)
+      ON CONFLICT (user_id) DO NOTHING
+    `, req.user.id);
 
     res.json({ success: true });
   } catch (error) {

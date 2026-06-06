@@ -100,6 +100,7 @@ import groupRoutes from './src/routes/groupRoutes.js';
 import gamificationRoutes from './src/routes/gamificationRoutes.js';
 import systemSettingsRoutes from './src/routes/systemSettingsRoutes.js';
 import adminExtensionsRoutes from './src/routes/adminExtensionsRoutes.js';
+import friendRoutes from './src/routes/friendRoutes.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -211,6 +212,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/admin', systemSettingsRoutes);
 app.use('/api/admin', adminExtensionsRoutes);
+app.use('/api/friends', friendRoutes);
 
 app.get('/api/admin/stats', requireAdmin, getStats);
 app.get('/api/admin/users', requireAdmin, getAdminUsers);
