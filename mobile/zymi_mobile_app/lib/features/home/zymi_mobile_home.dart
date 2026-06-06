@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../services/realtime/zymi_socket_client.dart';
 import '../chat/screens/conversation_list_screen.dart';
 import '../call/call_placeholder_screen.dart';
 import '../nearby/screens/nearby_screen.dart';
+import '../friend_requests_screen.dart';
 import '../diagnostics/mobile_diagnostics_screen.dart';
 import '../../services/api/auth_service.dart';
 import '../../services/api/nearby_service.dart';
@@ -16,6 +18,7 @@ import '../call/controllers/call_controller.dart';
 import '../call/screens/incoming_call_screen.dart';
 import '../../core/widgets/skeleton_placeholder.dart';
 import '../chat/widgets/user_search_delegate.dart';
+import '../../services/api/friend_service.dart';
 
 class ZymiMobileHome extends StatefulWidget {
   const ZymiMobileHome({super.key});
@@ -28,9 +31,11 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
   int _currentIndex = 0;
   String? _localUserId;
   Map<String, dynamic>? _user;
+  int _pendingRequests = 0;
 
   final ZymiSocketClient _socketClient = ZymiSocketClient();
   final AuthService _authService = AuthService();
+  final FriendService _friendService = FriendService();
   StreamSubscription<ZymiSocketStatus>? _socketSub;
   final CallController _callController = CallController();
 
@@ -79,8 +84,12 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
         if (token != null) {
           _socketClient.connect(token);
         }
+        // Request hardware permissions at boot
+        initializeAppPermissions();
         // Fire-and-forget location update so the user appears on nearby discovery
         _updateLocation();
+        // Load pending friend request count
+        _fetchPendingRequestCount();
         return;
       }
     } catch (e) {
@@ -89,6 +98,35 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
     // Not authenticated or network error — redirect to login
     if (mounted) {
       Navigator.pushReplacementNamed(context, ZymiRoutes.login);
+    }
+  }
+
+  Future<void> initializeAppPermissions() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.location,
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+
+    if (statuses[Permission.location]!.isDenied) {
+      final goSettings = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: ZymiColors.surface,
+          title: const Text('Location Required', style: TextStyle(color: Colors.white)),
+          content: const Text(
+            'Nearby discovery needs location access. Open settings to enable it.',
+            style: TextStyle(color: ZymiColors.textSecondary),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: ZymiColors.textMuted))),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Open Settings', style: TextStyle(color: ZymiColors.primary))),
+          ],
+        ),
+      );
+      if (goSettings == true) {
+        openAppSettings();
+      }
     }
   }
 
@@ -103,6 +141,13 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
     } catch (e) {
       debugPrint('[HOME] Location update skipped: $e');
     }
+  }
+
+  Future<void> _fetchPendingRequestCount() async {
+    try {
+      final requests = await _friendService.getPendingRequests();
+      if (mounted) setState(() => _pendingRequests = requests.length);
+    } catch (_) {}
   }
 
   @override
@@ -189,6 +234,30 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
             IconButton(
               icon: const Icon(Icons.search),
               onPressed: () => showSearch(context: context, delegate: UserSearchDelegate()),
+            ),
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.person_add_outlined),
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendRequestsScreen()));
+                    _fetchPendingRequestCount();
+                  },
+                ),
+                if (_pendingRequests > 0)
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: ZymiColors.danger, shape: BoxShape.circle),
+                      child: Text(
+                        '$_pendingRequests',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             IconButton(
               icon: const Icon(Icons.notifications_none),
