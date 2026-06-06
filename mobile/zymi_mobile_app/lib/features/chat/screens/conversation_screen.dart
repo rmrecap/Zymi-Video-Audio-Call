@@ -5,7 +5,6 @@ import '../widgets/message_status_indicator.dart';
 import '../widgets/offline_sync_banner.dart';
 import '../widgets/media_message_bubble.dart';
 import '../widgets/attachment_hub_sheet.dart';
-import '../widgets/voice_note_recorder.dart';
 import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
 
@@ -272,16 +271,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 : IconButton(
                     key: const ValueKey('mic'),
                     onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => VoiceNoteRecorder(
-                          onSent: (url, duration) {
-                            _controller.sendMessage(url, type: 'voice');
-                          },
-                        ),
-                      );
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice recording coming soon')));
                     },
                     icon: const Icon(Icons.mic_none_outlined, color: ZymiColors.primary),
                   ),
