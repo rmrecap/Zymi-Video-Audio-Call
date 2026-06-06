@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:record/record.dart';
-import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 enum VoiceRecorderState { idle, recording, paused }
@@ -46,10 +45,10 @@ class VoiceRecorderService {
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
         _recordDuration++;
       });
-      debugPrint('[VOICE] Recording started: $path');
+      print('[VOICE] Recording started: $path');
       return true;
     } catch (e) {
-      debugPrint('[VOICE] Failed to start recording: $e');
+      print('[VOICE] Failed to start recording: $e');
       return false;
     }
   }
@@ -60,10 +59,10 @@ class VoiceRecorderService {
     try {
       final path = await _recorder.stop();
       _state = VoiceRecorderState.idle;
-      debugPrint('[VOICE] Recording stopped: $path (${_recordDuration}s)');
+      print('[VOICE] Recording stopped: $path (${_recordDuration}s)');
       return path;
     } catch (e) {
-      debugPrint('[VOICE] Failed to stop recording: $e');
+      print('[VOICE] Failed to stop recording: $e');
       return null;
     }
   }

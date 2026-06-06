@@ -140,8 +140,9 @@ class _VoiceNoteRecorderState extends State<VoiceNoteRecorder>
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _roundButton(Icons.close, ZymiColors.textMuted, () async {
+                  final nav = Navigator.of(context);
                   await _service.cancelRecording();
-                  if (mounted) Navigator.pop(context);
+                  if (mounted) nav.pop();
                 }),
                 _roundButton(Icons.check, ZymiColors.success, _stopAndSend),
               ],
