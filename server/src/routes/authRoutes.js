@@ -195,12 +195,35 @@ export const adminLogin = async (req, res) => {
       console.log('[LOGIN_DIAG] User not found — attempting emergency auto-seed');
       try {
         const fallbackHash = bcrypt.hashSync(password, 10);
-        await run(
-          `INSERT INTO users (username, email, password_hash, role)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
-          [username, 'admin@zymi.com', fallbackHash, 'super_admin']
+        // Check by email first, then by username — avoids ON CONFLICT
+        // ambiguity when both username and email have separate UNIQUE constraints
+        const existingByEmail = await get(
+          "SELECT id FROM users WHERE email = $1",
+          ['admin@zymi.com']
         );
+        if (existingByEmail) {
+          await run(
+            `UPDATE users SET username = $1, password_hash = $2, role = $3 WHERE email = $4`,
+            [username, fallbackHash, 'super_admin', 'admin@zymi.com']
+          );
+        } else {
+          const existingByUsername = await get(
+            "SELECT id FROM users WHERE username = $1",
+            [username]
+          );
+          if (existingByUsername) {
+            await run(
+              `UPDATE users SET password_hash = $1, role = $2, email = $3 WHERE username = $4`,
+              [fallbackHash, 'super_admin', 'admin@zymi.com', username]
+            );
+          } else {
+            await run(
+              `INSERT INTO users (username, email, password_hash, role)
+               VALUES ($1, $2, $3, $4)`,
+              [username, 'admin@zymi.com', fallbackHash, 'super_admin']
+            );
+          }
+        }
         console.log('[LOGIN_DIAG] Emergency seed completed — retrying fetch');
         const retryRow = await get(
           'SELECT * FROM users WHERE (username = $1 OR email = $2)',
