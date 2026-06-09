@@ -118,15 +118,17 @@ const io = new Server(httpServer, {
   pingInterval: 25000
 });
 
+const corsOrigins = ['https://rmrecap.github.io', 'http://localhost:3000'];
+
 app.use(cors({
-  origin: 'https://rmrecap.github.io',
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.options('*', cors({
-  origin: 'https://rmrecap.github.io',
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

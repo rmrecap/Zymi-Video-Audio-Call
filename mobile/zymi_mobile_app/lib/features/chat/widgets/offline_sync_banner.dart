@@ -8,6 +8,7 @@ class OfflineSyncBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<ZymiSocketStatus>(
       stream: ZymiSocketClient().statusStream,
+      initialData: ZymiSocketClient().currentStatus,
       builder: (context, snapshot) {
         final status = snapshot.data ?? ZymiSocketStatus.disconnected;
         

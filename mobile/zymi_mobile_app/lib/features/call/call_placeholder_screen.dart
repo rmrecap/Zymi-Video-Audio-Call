@@ -25,23 +25,31 @@ class _CallPlaceholderScreenState extends State<CallPlaceholderScreen> {
   }
 
   Future<void> _loadCallHistory() async {
-    final user = await _authService.getMe();
-    final userId = user?['id'];
-    if (userId == null) return;
-    final token = await _authService.getToken();
-    if (token == null) return;
     try {
+      final user = await _authService.getMe();
+      final userId = user?['id'];
+      if (userId == null || !mounted) {
+        setState(() => _isLoading = false);
+        return;
+      }
+      final token = await _authService.getToken();
+      if (token == null || !mounted) {
+        setState(() => _isLoading = false);
+        return;
+      }
       final res = await http.get(
         Uri.parse('${AppConfig.apiUrl}/api/calls/$userId'),
         headers: {'Authorization': 'Bearer $token'},
-      );
-      if (res.statusCode == 200 && mounted) {
-        setState(() {
-          _callHistory = (jsonDecode(res.body) as List).map((e) => Map<String, dynamic>.from(e)).toList();
-          _isLoading = false;
-        });
-      } else if (mounted) {
-        setState(() => _isLoading = false);
+      ).timeout(const Duration(seconds: 15));
+      if (mounted) {
+        if (res.statusCode == 200) {
+          setState(() {
+            _callHistory = (jsonDecode(res.body) as List).map((e) => Map<String, dynamic>.from(e)).toList();
+            _isLoading = false;
+          });
+        } else {
+          setState(() => _isLoading = false);
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
