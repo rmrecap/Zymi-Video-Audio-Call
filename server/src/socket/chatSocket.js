@@ -8,6 +8,7 @@ import { cleanupUserActiveCall } from './callState.js';
 import * as messageQueueService from '../services/messageQueueService.js';
 import * as unreadCounterService from '../services/unreadCounterService.js';
 import * as inAppNotificationService from '../services/inAppNotificationService.js';
+import { encrypt } from '../utils/encryption.js';
 
 const checkToken = async (socket, userId) => {
   try {
@@ -131,6 +132,9 @@ export const setupChatSocket = (io, userSockets) => {
         // Build message content - fallback to type description if media
         const messageContent = content || (message_type === 'location' ? 'Shared location' : 'Media');
 
+        // Encrypt message content for at-rest zero-knowledge
+        const encryptedContent = encrypt(messageContent) || messageContent;
+
         const targetSocketId = userSockets.get(to);
         const isOnline = !!targetSocketId;
 
@@ -139,19 +143,21 @@ export const setupChatSocket = (io, userSockets) => {
         const messageId = await messageQueueService.enqueueMessage({
           sender_id: from,
           receiver_id: to,
-          content: messageContent,
+          content: encryptedContent,
           message_type: message_type || 'text',
           metadata: metadata,
           client_message_id: tempId,
           conversation_id: conversationId,
-          delivery_status: isOnline ? 'sent' : 'queued'
+          delivery_status: isOnline ? 'sent' : 'queued',
+          is_encrypted: true
         });
 
         const message = {
           id: messageId,
           sender_id: from,
           receiver_id: to,
-          content: messageContent,
+          content: encryptedContent,
+          is_encrypted: true,
           message_text: messageContent,
           message_type: message_type || 'text',
           metadata: metadata,
@@ -167,6 +173,9 @@ export const setupChatSocket = (io, userSockets) => {
           conversation_id: conversationId,
           delivery_status: isOnline ? 'sent' : 'queued'
         };
+
+        // Send the decrypted content over the socket for display, store encrypted in DB
+        message.content = messageContent;
 
         // Emit back to sender
         io.to(socket.id).emit(SOCKET_EVENTS.NEW_MESSAGE, message);

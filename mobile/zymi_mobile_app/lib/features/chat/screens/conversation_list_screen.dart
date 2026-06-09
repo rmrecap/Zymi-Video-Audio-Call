@@ -20,6 +20,13 @@ class ConversationListScreen extends StatelessWidget {
         title: const Text('Conversations', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF1e293b),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.groups_outlined, color: ZymiColors.primary),
+            tooltip: 'Groups',
+            onPressed: () => Navigator.pushNamed(context, ZymiRoutes.groupList),
+          ),
+        ],
       ),
       body: ListView.builder(
         itemCount: conversations.length,

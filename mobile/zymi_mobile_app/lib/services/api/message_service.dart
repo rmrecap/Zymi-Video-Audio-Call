@@ -64,4 +64,28 @@ class MessageService {
     }
     throw Exception('Failed to load message health');
   }
+
+  static Future<Map<String, dynamic>> editMessage(int messageId, String newContent, String token) async {
+    final response = await http.put(
+      Uri.parse('$_baseUrl/$messageId/edit'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'content': newContent}),
+    );
+    return json.decode(response.body);
+  }
+
+  static Future<bool> deleteMessage(int messageId, String token) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/delete'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'messageId': messageId}),
+    );
+    return response.statusCode == 200;
+  }
 }

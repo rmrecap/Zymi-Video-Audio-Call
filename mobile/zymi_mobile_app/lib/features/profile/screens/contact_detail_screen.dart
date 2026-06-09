@@ -5,6 +5,7 @@ import '../widgets/profile_media_tabs.dart';
 import '../widgets/profile_overflow_menu.dart';
 import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
+import '../../../services/api/block_service.dart';
 
 class ContactDetailScreen extends StatefulWidget {
   final String userId;
@@ -21,6 +22,7 @@ class ContactDetailScreen extends StatefulWidget {
 }
 
 class _ContactDetailScreenState extends State<ContactDetailScreen> {
+  final BlockService _blockService = BlockService();
   bool _isMuted = false;
 
   void _copyToClipboard(String text) {
@@ -61,7 +63,14 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
       backgroundColor: const Color(0xFF1e293b),
       actions: [
         ProfileOverflowMenu(
-          onBlock: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User blocked'))),
+          onBlock: () async {
+            final success = await _blockService.blockUser(int.parse(widget.userId));
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(success ? 'User blocked' : 'Failed to block user')),
+              );
+            }
+          },
           onReport: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User reported'))),
           onShare: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact shared'))),
         ),

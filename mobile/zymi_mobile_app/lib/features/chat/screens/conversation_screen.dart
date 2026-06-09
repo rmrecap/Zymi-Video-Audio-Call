@@ -7,6 +7,8 @@ import '../widgets/media_message_bubble.dart';
 import '../widgets/attachment_hub_sheet.dart';
 import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
+import '../../../services/api/message_service.dart';
+import '../../../services/api/auth_service.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String peerId;
@@ -145,51 +147,129 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
+  void _showMessageContextMenu(ZymiMessage msg) {
+    if (!msg.isMine) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ZymiColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit, color: ZymiColors.primary),
+                title: const Text('Edit Message', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditDialog(msg);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: ZymiColors.danger),
+                title: const Text('Delete Message', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _deleteMessage(msg);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(ZymiMessage msg) {
+    final editController = TextEditingController(text: msg.content);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ZymiColors.surface,
+        title: const Text('Edit Message', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: editController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'Edit your message...'),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: ZymiColors.textMuted))),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final token = await AuthService().getToken();
+              if (token == null) return;
+              await MessageService.editMessage(msg.id, editController.text.trim(), token);
+              _controller.loadHistory();
+            },
+            child: const Text('Save', style: TextStyle(color: ZymiColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteMessage(ZymiMessage msg) async {
+    final token = await AuthService().getToken();
+    if (token == null) return;
+    await MessageService.deleteMessage(msg.id, token);
+    _controller.loadHistory();
+  }
+
   Widget _buildMessageBubble(ZymiMessage msg) {
     final isMine = msg.isMine;
     if (msg.type == 'media') {
-      return Align(
-        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-        child: MediaMessageBubble(
-          isMine: isMine,
-          serverMetadata: msg.mediaMetadata,
-          onRetry: () => _controller.retryMessage(msg.tempId ?? ''),
+      return GestureDetector(
+        onLongPress: isMine ? () => _showMessageContextMenu(msg) : null,
+        child: Align(
+          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          child: MediaMessageBubble(
+            isMine: isMine,
+            serverMetadata: msg.mediaMetadata,
+            onRetry: () => _controller.retryMessage(msg.tempId ?? ''),
+          ),
         ),
       );
     }
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-        decoration: BoxDecoration(
-          color: isMine ? const Color(0xFF3B82F6) : const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(16).copyWith(
-            bottomRight: isMine ? const Radius.circular(0) : const Radius.circular(16),
-            bottomLeft: !isMine ? const Radius.circular(0) : const Radius.circular(16),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(msg.content, style: const TextStyle(color: Colors.white, fontSize: 15)),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${msg.createdAt.hour}:${msg.createdAt.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(color: Colors.white54, fontSize: 10),
-                ),
-                if (isMine) ...[
-                  const SizedBox(width: 4),
-                  MessageStatusIndicator(status: msg.status, isMine: true),
-                ],
-              ],
+      child: GestureDetector(
+        onLongPress: isMine ? () => _showMessageContextMenu(msg) : null,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+          decoration: BoxDecoration(
+            color: isMine ? const Color(0xFF3B82F6) : const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(16).copyWith(
+              bottomRight: isMine ? const Radius.circular(0) : const Radius.circular(16),
+              bottomLeft: !isMine ? const Radius.circular(0) : const Radius.circular(16),
             ),
-          ],
+          ),
+          child: Column(
+            crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              Text(msg.content, style: const TextStyle(color: Colors.white, fontSize: 15)),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${msg.createdAt.hour}:${msg.createdAt.minute.toString().padLeft(2, '0')}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 10),
+                  ),
+                  if (isMine) ...[
+                    const SizedBox(width: 4),
+                    MessageStatusIndicator(status: msg.status, isMine: true),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

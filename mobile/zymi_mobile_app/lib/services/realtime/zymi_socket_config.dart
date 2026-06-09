@@ -1,5 +1,5 @@
 class ZymiSocketConfig {
-  static const String baseUrl = String.fromEnvironment('API_URL', defaultValue: 'http://localhost:5001');
+  static const String baseUrl = String.fromEnvironment('API_URL', defaultValue: 'https://zymi-server.onrender.com');
   
   /// Get socket options for the UI (Main Isolate) socket connection.
   /// type=UI identifies this as the volatile view socket.
