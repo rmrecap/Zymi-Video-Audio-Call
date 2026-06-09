@@ -12,7 +12,6 @@ import '../../features/verification/screens/email_otp_screen.dart';
 import '../../features/verification/screens/phone_otp_screen.dart';
 import '../../features/notifications/screens/notification_center_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
-import '../../features/call/call_preflight_screen.dart';
 import '../../features/profile/screens/contact_detail_screen.dart';
 import '../../features/friends_list_screen.dart';
 import '../../features/chat/screens/group_list_screen.dart';
@@ -36,7 +35,6 @@ class ZymiRoutes {
   static const String notifications = '/notifications';
   static const String profile = '/profile';
   static const String contactDetail = '/contact_detail';
-  static const String callPreflight = '/call_preflight';
   static const String friendsList = '/friends_list';
   static const String groupList = '/group_list';
   static const String groupChat = '/group_chat';
@@ -103,15 +101,6 @@ class ZymiRoutes {
           builder: (_) => GroupCallScreen(
             groupId: args?['groupId'] ?? '',
             groupName: args?['groupName'] ?? 'Group',
-            isVideo: args?['isVideo'] ?? false,
-          ),
-        );
-      case callPreflight:
-        final args = settings.arguments as Map<String, dynamic>?;
-        return MaterialPageRoute(
-          builder: (_) => CallPreflightScreen(
-            peerId: args?['peerId'] ?? '',
-            peerName: args?['peerName'] ?? 'Unknown',
             isVideo: args?['isVideo'] ?? false,
           ),
         );

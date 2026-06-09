@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import '../widgets/profile_action_button.dart';
 import '../widgets/profile_media_tabs.dart';
 import '../widgets/profile_overflow_menu.dart';
-import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
 import '../../../services/api/block_service.dart';
+import '../../call/call_launcher.dart';
 
 class ContactDetailScreen extends StatefulWidget {
   final String userId;
@@ -124,24 +124,12 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
         ProfileActionButton(
           icon: Icons.call_outlined,
           label: 'Call',
-          onTap: () {
-            Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
-              'peerId': widget.userId,
-              'peerName': widget.username,
-              'isVideo': false,
-            });
-          },
+          onTap: () => CallLauncher.startCall(context, peerId: widget.userId, peerName: widget.username),
         ),
         ProfileActionButton(
           icon: Icons.videocam_outlined,
           label: 'Video',
-          onTap: () {
-            Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
-              'peerId': widget.userId,
-              'peerName': widget.username,
-              'isVideo': true,
-            });
-          },
+          onTap: () => CallLauncher.startCall(context, peerId: widget.userId, peerName: widget.username, isVideo: true),
         ),
       ],
     );

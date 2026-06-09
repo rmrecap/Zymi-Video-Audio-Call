@@ -20,6 +20,7 @@ import '../../core/widgets/skeleton_placeholder.dart';
 import '../chat/widgets/user_search_delegate.dart';
 import '../../services/api/friend_service.dart';
 import '../../services/realtime/zymi_presence_service.dart';
+import '../call/call_launcher.dart';
 
 class ZymiMobileHome extends StatefulWidget {
   const ZymiMobileHome({super.key});
@@ -248,9 +249,9 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
                   if (action == 'chat') {
                     Navigator.pushNamed(context, ZymiRoutes.chat, arguments: {'peerId': peerId, 'peerName': peerName});
                   } else if (action == 'audioCall') {
-                    Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {'peerId': peerId, 'peerName': peerName, 'isVideo': false});
+                    CallLauncher.startCall(context, peerId: peerId, peerName: peerName);
                   } else if (action == 'videoCall') {
-                    Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {'peerId': peerId, 'peerName': peerName, 'isVideo': true});
+                    CallLauncher.startCall(context, peerId: peerId, peerName: peerName, isVideo: true);
                   }
                 }
               },

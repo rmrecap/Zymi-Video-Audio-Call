@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'zymi_socket_config.dart';
 import 'zymi_call_event_guard.dart';
+import 'zymi_chat_socket_service.dart';
+import 'zymi_chat_payloads.dart';
+import '../../features/chat/services/offline_message_queue.dart';
 
 enum ZymiSocketStatus { connected, disconnected, connecting, error, authError }
 
@@ -25,10 +28,24 @@ class ZymiSocketClient {
 
     _socket = io.io(ZymiSocketConfig.baseUrl, ZymiSocketConfig.getOptions(token));
 
-    _socket!.onConnect((_) {
+    _socket!.onConnect((_) async {
       debugPrint('[SOCKET] Connected');
       _currentStatus = ZymiSocketStatus.connected;
       _statusController.add(_currentStatus);
+      final pending = await OfflineMessageQueue.dequeueAll();
+      for (final msg in pending) {
+        ZymiChatSocketService().sendPrivateMessage(PrivateMessagePayload(
+          to: msg['to'] as String? ?? '',
+          from: msg['from'] as String? ?? '',
+          content: msg['content'] as String? ?? '',
+          tempId: msg['tempId'] as String? ?? '',
+          messageType: msg['message_type'] as String? ?? 'text',
+          metadata: msg['metadata'] as Map<String, dynamic>?,
+        ));
+      }
+      if (pending.isNotEmpty) {
+        debugPrint('[SOCKET] Flushed ${pending.length} offline messages');
+      }
     });
 
     _socket!.onDisconnect((_) {

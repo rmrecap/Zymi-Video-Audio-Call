@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/config/app_config.dart';
-import '../../core/navigation/zymi_routes.dart';
 import '../../core/theme/zymi_brand_colors.dart';
 import '../../services/api/auth_service.dart';
+import 'call_launcher.dart';
 
 class CallPlaceholderScreen extends StatefulWidget {
   const CallPlaceholderScreen({super.key});
@@ -119,13 +119,12 @@ class _CallPlaceholderScreenState extends State<CallPlaceholderScreen> {
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.call_outlined, color: ZymiColors.primary, size: 20),
-                          onPressed: () {
-                            Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
-                              'peerId': isIncoming ? callerId : receiverId,
-                              'peerName': peerName,
-                              'isVideo': callType == 'video',
-                            });
-                          },
+                          onPressed: () => CallLauncher.startCall(
+                            context,
+                            peerId: isIncoming ? callerId : receiverId,
+                            peerName: peerName,
+                            isVideo: callType == 'video',
+                          ),
                         ),
                       );
                     },

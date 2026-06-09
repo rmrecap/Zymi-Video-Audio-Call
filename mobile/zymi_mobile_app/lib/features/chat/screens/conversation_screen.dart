@@ -9,6 +9,7 @@ import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
 import '../../../services/api/message_service.dart';
 import '../../../services/api/auth_service.dart';
+import '../../call/call_launcher.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String peerId;
@@ -98,23 +99,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.call_outlined, color: ZymiColors.primary),
-            onPressed: () {
-               Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
-                 'peerId': widget.peerId,
-                 'peerName': widget.peerName,
-                 'isVideo': false,
-               });
-            },
+            onPressed: () => CallLauncher.startCall(context, peerId: widget.peerId, peerName: widget.peerName),
           ),
           IconButton(
             icon: const Icon(Icons.videocam_outlined, color: ZymiColors.primary),
-            onPressed: () {
-               Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
-                 'peerId': widget.peerId,
-                 'peerName': widget.peerName,
-                 'isVideo': true,
-               });
-            },
+            onPressed: () => CallLauncher.startCall(context, peerId: widget.peerId, peerName: widget.peerName, isVideo: true),
           ),
           IconButton(
             icon: const Icon(Icons.more_vert),

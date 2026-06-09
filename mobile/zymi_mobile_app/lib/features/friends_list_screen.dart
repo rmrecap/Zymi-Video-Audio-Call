@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api/friend_service.dart';
 import '../core/theme/zymi_brand_colors.dart';
 import '../core/navigation/zymi_routes.dart';
+import 'call/call_launcher.dart';
 
 class FriendsListScreen extends StatefulWidget {
   const FriendsListScreen({super.key});
@@ -144,24 +145,12 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                                 IconButton(
                                   icon: const Icon(Icons.call_outlined, color: ZymiColors.success, size: 20),
                                   tooltip: 'Audio Call',
-                                  onPressed: () {
-                                    Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
-                                      'peerId': userId,
-                                      'peerName': username,
-                                      'isVideo': false,
-                                    });
-                                  },
+                                  onPressed: () => CallLauncher.startCall(context, peerId: userId, peerName: username),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.videocam_outlined, color: ZymiColors.purple, size: 20),
                                   tooltip: 'Video Call',
-                                  onPressed: () {
-                                    Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {
-                                      'peerId': userId,
-                                      'peerName': username,
-                                      'isVideo': true,
-                                    });
-                                  },
+                                  onPressed: () => CallLauncher.startCall(context, peerId: userId, peerName: username, isVideo: true),
                                 ),
                               ],
                             ),
