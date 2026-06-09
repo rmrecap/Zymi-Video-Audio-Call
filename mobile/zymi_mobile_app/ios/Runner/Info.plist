@@ -36,5 +36,9 @@
 	<string>ZYMI requires camera access to place video calls.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ZYMI requires microphone access to place audio and video calls.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Zymi requires access to your location for Nearby Discovery.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Zymi requires access to your location for Nearby Discovery.</string>
 </dict>
 </plist>

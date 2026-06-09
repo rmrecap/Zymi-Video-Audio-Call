@@ -14,6 +14,7 @@ import '../../features/notifications/screens/notification_center_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/call/call_preflight_screen.dart';
 import '../../features/profile/screens/contact_detail_screen.dart';
+import '../../features/friends_list_screen.dart';
 
 class ZymiRoutes {
   static const String home = '/home';
@@ -33,6 +34,7 @@ class ZymiRoutes {
   static const String profile = '/profile';
   static const String contactDetail = '/contact_detail';
   static const String callPreflight = '/call_preflight';
+  static const String friendsList = '/friends_list';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -77,6 +79,8 @@ class ZymiRoutes {
             username: args?['username'] ?? 'User',
           ),
         );
+      case friendsList:
+        return MaterialPageRoute(builder: (_) => const FriendsListScreen());
       case callPreflight:
         final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(

@@ -133,17 +133,23 @@ router.post('/remove', requireAuth, async (req, res) => {
 router.get('/list', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
+    const userSockets = req.app.get('userSockets');
 
     const friends = await all(
       `SELECT u.id, u.username, u.avatar, f.status, f.created_at
        FROM friendships f
        JOIN users u ON u.id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
-       WHERE (f.requester_id = $1 OR f.addressee_id = $1)
+       WHERE (f.requester_id = $1 OR f.addressee_id = $1) AND f.status = 'accepted'
        ORDER BY f.created_at DESC`,
       [userId]
     );
 
-    res.json(friends);
+    const friendsWithOnline = friends.map((f) => ({
+      ...f,
+      is_online: userSockets ? userSockets.has(String(f.id)) : false,
+    }));
+
+    res.json(friendsWithOnline);
   } catch (err) {
     console.error('[FRIENDS] List error:', err.message);
     res.status(500).json({ error: err.message });

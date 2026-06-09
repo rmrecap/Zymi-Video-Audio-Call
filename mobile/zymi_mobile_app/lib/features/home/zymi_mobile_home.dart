@@ -237,6 +237,10 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
               icon: const Icon(Icons.search),
               onPressed: () => showSearch(context: context, delegate: UserSearchDelegate()),
             ),
+            IconButton(
+              icon: const Icon(Icons.people_outline),
+              onPressed: () => Navigator.pushNamed(context, ZymiRoutes.friendsList),
+            ),
             Stack(
               children: [
                 IconButton(
