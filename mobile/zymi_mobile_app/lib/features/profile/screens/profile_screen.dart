@@ -325,11 +325,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.emoji_events, color: ZymiColors.warning, size: 20),
-              const SizedBox(width: 8),
-              const Text('GAMIFICATION', style: TextStyle(color: Colors.white38, fontSize: 11, letterSpacing: 1.5)),
+              Icon(Icons.emoji_events, color: ZymiColors.warning, size: 20),
+              SizedBox(width: 8),
+              Text('GAMIFICATION', style: TextStyle(color: Colors.white38, fontSize: 11, letterSpacing: 1.5)),
             ],
           ),
           const SizedBox(height: 16),
@@ -365,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: ZymiColors.warning.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.emoji_events, color: ZymiColors.warning, size: 20),
+                      child: const Icon(Icons.emoji_events, color: ZymiColors.warning, size: 20),
                     ),
                   );
                 },

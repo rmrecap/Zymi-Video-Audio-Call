@@ -23,7 +23,7 @@ class ConversationListScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: Icon(Icons.groups_outlined, color: ZymiColors.primary),
+            icon: const Icon(Icons.groups_outlined, color: ZymiColors.primary),
             tooltip: 'Groups',
             onPressed: () => Navigator.pushNamed(context, ZymiRoutes.groupList),
           ),
