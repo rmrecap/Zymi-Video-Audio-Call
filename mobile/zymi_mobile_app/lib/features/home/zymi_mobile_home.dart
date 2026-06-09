@@ -19,6 +19,7 @@ import '../call/screens/incoming_call_screen.dart';
 import '../../core/widgets/skeleton_placeholder.dart';
 import '../chat/widgets/user_search_delegate.dart';
 import '../../services/api/friend_service.dart';
+import '../../services/realtime/zymi_presence_service.dart';
 
 class ZymiMobileHome extends StatefulWidget {
   const ZymiMobileHome({super.key});
@@ -38,10 +39,12 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
   final FriendService _friendService = FriendService();
   StreamSubscription<ZymiSocketStatus>? _socketSub;
   final CallController _callController = CallController();
+  final ZymiPresenceService _presenceService = ZymiPresenceService();
 
   @override
   void initState() {
     super.initState();
+    _presenceService.init();
     _socketSub = _socketClient.statusStream.listen((status) {
       if (!mounted) return;
       if (status == ZymiSocketStatus.authError) {

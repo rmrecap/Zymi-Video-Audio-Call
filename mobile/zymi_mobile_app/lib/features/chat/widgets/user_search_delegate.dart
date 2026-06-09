@@ -8,6 +8,12 @@ import '../../../services/api/auth_service.dart';
 import '../../../services/api/friend_service.dart';
 import '../../nearby/screens/nearby_screen.dart' show SkeletonShimmer;
 
+class _PhoneLookupResult {
+  final bool found;
+  final Map<String, dynamic>? user;
+  _PhoneLookupResult({required this.found, this.user});
+}
+
 class UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?>{
   final FriendService _friendService = FriendService();
 

@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
+import '../../../services/api/auth_service.dart';
 
 class ConnectivitySettingsScreen extends StatefulWidget {
   const ConnectivitySettingsScreen({super.key});
@@ -12,12 +16,29 @@ class ConnectivitySettingsScreen extends StatefulWidget {
 
 class _ConnectivitySettingsScreenState
     extends State<ConnectivitySettingsScreen> {
+  final AuthService _authService = AuthService();
   bool _autoFixEnabled = true;
+  Map<String, dynamic>? _policy;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _fetchPolicy();
+  }
+
+  Future<void> _fetchPolicy() async {
+    final token = await _authService.getToken();
+    if (token == null) return;
+    try {
+      final res = await http.get(
+        Uri.parse('${AppConfig.apiUrl}/api/connectivity/policy'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (res.statusCode == 200 && mounted) {
+        setState(() => _policy = jsonDecode(res.body));
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadSettings() async {
@@ -68,13 +89,22 @@ class _ConnectivitySettingsScreenState
             ),
           ),
           _buildSectionHeader('Connection Health'),
-          const ListTile(
-            leading: Icon(Icons.speed, color: ZymiColors.primary),
-            title: Text('Protocol Strategy',
+          ListTile(
+            leading: const Icon(Icons.speed, color: ZymiColors.primary),
+            title: const Text('Protocol Strategy',
                 style: TextStyle(color: Colors.white)),
-            subtitle: Text('STUN-First, TURN-Fallback',
-                style: TextStyle(color: Colors.white54)),
+            subtitle: Text(
+              _policy != null ? '${_policy!['strategy'] ?? 'STUN-First'}, ${_policy!['fallback'] ?? 'TURN-Fallback'}' : 'Loading...',
+              style: const TextStyle(color: Colors.white54)),
           ),
+          if (_policy != null && _policy!['relay'] != null)
+            ListTile(
+              leading: const Icon(Icons.wifi_tethering, color: ZymiColors.purple),
+              title: const Text('Relay Region',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: Text('${_policy!['relay']}',
+                  style: const TextStyle(color: Colors.white54)),
+            ),
         ],
       ),
     );

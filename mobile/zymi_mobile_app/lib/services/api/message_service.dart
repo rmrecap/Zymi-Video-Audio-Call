@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/config/app_config.dart';
+import 'encryption_service.dart';
 
 class MessageService {
   static const String _baseUrl = '${AppConfig.apiUrl}/api/messages';
@@ -28,7 +29,14 @@ class MessageService {
     );
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final messages = json.decode(response.body) as List;
+      for (final msg in messages) {
+        if (msg is Map<String, dynamic> && msg['is_encrypted'] == true) {
+          final decrypted = EncryptionService.decrypt(msg['content'] ?? '');
+          if (decrypted != null) msg['content'] = decrypted;
+        }
+      }
+      return messages;
     }
     throw Exception('Failed to load messages');
   }

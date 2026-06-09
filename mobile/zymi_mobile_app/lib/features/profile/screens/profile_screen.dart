@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../services/api/profile_service.dart';
 import '../../../services/api/auth_service.dart';
+import '../../../services/api/gamification_service.dart';
 import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/widgets/skeleton_placeholder.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
@@ -16,10 +17,14 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _profileService = ProfileService();
   final _authService = AuthService();
+  final _gamificationService = GamificationService();
   final _statusController = TextEditingController();
   final _displayNameController = TextEditingController();
   
   Map<String, dynamic>? _profile;
+  Map<String, dynamic>? _gamification;
+  List<Map<String, dynamic>> _badges = [];
+  List<Map<String, dynamic>> _achievements = [];
   bool _isLoading = true;
   bool _isEditingStatus = false;
   bool _isEditingName = false;
@@ -41,15 +46,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
     final user = await _authService.getMe();
     if (user != null) {
-      // In Phase 66 we use /profile/me
-      // But let's check if ProfileService has getMyProfile.
-      // I'll just use getMe for now or add getMyProfile to ProfileService.
-      setState(() {
-        _profile = user;
-        _statusController.text = user['status_text'] ?? '';
-        _displayNameController.text = user['display_name'] ?? user['username'] ?? '';
-        _isLoading = false;
-      });
+      final gamification = await _gamificationService.getPoints();
+      final badges = await _gamificationService.getBadges();
+      final achievements = await _gamificationService.getAchievements();
+      if (mounted) {
+        setState(() {
+          _profile = user;
+          _gamification = gamification;
+          _badges = badges;
+          _achievements = achievements;
+          _statusController.text = user['status_text'] ?? '';
+          _displayNameController.text = user['display_name'] ?? user['username'] ?? '';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -100,6 +110,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildInfoCard(),
               const SizedBox(height: 24),
               _buildVerificationSection(),
+              const SizedBox(height: 24),
+              _buildGamificationPanel(),
               const SizedBox(height: 32),
               _buildActionButtons(),
             ],
@@ -297,6 +309,94 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGamificationPanel() {
+    final points = _gamification?['points'] ?? 0;
+    final level = _gamification?['level'] ?? 1;
+    final messagesSent = _gamification?['messages_sent'] ?? 0;
+    final callsMade = _gamification?['calls_made'] ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1e293b),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emoji_events, color: ZymiColors.warning, size: 20),
+              const SizedBox(width: 8),
+              const Text('GAMIFICATION', style: TextStyle(color: Colors.white38, fontSize: 11, letterSpacing: 1.5)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _statBadge(Icons.stars, 'Level', '$level', ZymiColors.purple),
+              const SizedBox(width: 16),
+              _statBadge(Icons.monetization_on, 'XP', '$points', ZymiColors.warning),
+              const SizedBox(width: 16),
+              _statBadge(Icons.chat, 'Messages', '$messagesSent', ZymiColors.primary),
+              const SizedBox(width: 16),
+              _statBadge(Icons.call, 'Calls', '$callsMade', ZymiColors.success),
+            ],
+          ),
+          if (_badges.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text('BADGES', style: TextStyle(color: Colors.white38, fontSize: 11, letterSpacing: 1.5)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _badges.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final badge = _badges[index];
+                  return Tooltip(
+                    message: badge['name'] ?? '',
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: ZymiColors.warning.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.emoji_events, color: ZymiColors.warning, size: 20),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statBadge(IconData icon, String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9)),
+          ],
+        ),
+      ),
     );
   }
 

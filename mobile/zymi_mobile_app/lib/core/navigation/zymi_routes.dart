@@ -17,6 +17,7 @@ import '../../features/profile/screens/contact_detail_screen.dart';
 import '../../features/friends_list_screen.dart';
 import '../../features/chat/screens/group_list_screen.dart';
 import '../../features/chat/screens/group_chat_screen.dart';
+import '../../features/call/group_call_screen.dart';
 
 class ZymiRoutes {
   static const String home = '/home';
@@ -39,6 +40,7 @@ class ZymiRoutes {
   static const String friendsList = '/friends_list';
   static const String groupList = '/group_list';
   static const String groupChat = '/group_chat';
+  static const String groupCall = '/group_call';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -93,6 +95,15 @@ class ZymiRoutes {
           builder: (_) => GroupChatScreen(
             groupId: args?['groupId'] ?? '',
             groupName: args?['groupName'] ?? 'Group',
+          ),
+        );
+      case groupCall:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => GroupCallScreen(
+            groupId: args?['groupId'] ?? '',
+            groupName: args?['groupName'] ?? 'Group',
+            isVideo: args?['isVideo'] ?? false,
           ),
         );
       case callPreflight:

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
+import '../../../core/navigation/zymi_routes.dart';
 import '../../../services/api/auth_service.dart';
 
 class GroupChatScreen extends StatefulWidget {
@@ -69,6 +70,18 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1e293b),
         title: Text(widget.groupName, style: const TextStyle(color: Colors.white)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.call_outlined, color: ZymiColors.success),
+            tooltip: 'Group Audio Call',
+            onPressed: () => _startGroupCall(false),
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined, color: ZymiColors.purple),
+            tooltip: 'Group Video Call',
+            onPressed: () => _startGroupCall(true),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -130,5 +143,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         ],
       ),
     );
+  }
+
+  void _startGroupCall(bool isVideo) {
+    Navigator.pushNamed(context, ZymiRoutes.groupCall, arguments: {
+      'groupId': widget.groupId,
+      'groupName': widget.groupName,
+      'isVideo': isVideo,
+    });
   }
 }
