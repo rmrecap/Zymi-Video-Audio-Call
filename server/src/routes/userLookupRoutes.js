@@ -7,7 +7,7 @@ import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 
-// GET /api/users/search?q=username — partial text search (ILIKE)
+// GET /api/users/search?q=username — multi-criteria search (username, email, phone)
 router.get('/search', requireAuth, async (req, res) => {
   try {
     const { q } = req.query;
@@ -17,12 +17,14 @@ router.get('/search', requireAuth, async (req, res) => {
     const query = String(q).trim();
     const pattern = `%${query}%`;
     const users = await all(
-      `SELECT id, username, avatar
+      `SELECT id, username, email, phone, avatar, role
        FROM users
-       WHERE username ILIKE $1
+       WHERE (username ILIKE $1
           OR email ILIKE $1
+          OR phone LIKE $1)
+          AND id != $2
        LIMIT 20`,
-      [pattern]
+      [pattern, String(req.user.id)]
     );
     res.json(users);
   } catch (err) {

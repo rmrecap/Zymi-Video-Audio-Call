@@ -235,7 +235,22 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
               ),
             IconButton(
               icon: const Icon(Icons.search),
-              onPressed: () => showSearch(context: context, delegate: UserSearchDelegate()),
+              onPressed: () async {
+                final result = await showSearch<Map<String, dynamic>?>(context: context, delegate: UserSearchDelegate());
+                if (result != null && context.mounted) {
+                  final peerId = result['peerId'] as String?;
+                  final peerName = result['peerName'] as String? ?? 'Unknown';
+                  final action = result['action'] as String?;
+                  if (peerId == null || action == null) return;
+                  if (action == 'chat') {
+                    Navigator.pushNamed(context, ZymiRoutes.chat, arguments: {'peerId': peerId, 'peerName': peerName});
+                  } else if (action == 'audioCall') {
+                    Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {'peerId': peerId, 'peerName': peerName, 'isVideo': false});
+                  } else if (action == 'videoCall') {
+                    Navigator.pushNamed(context, ZymiRoutes.callPreflight, arguments: {'peerId': peerId, 'peerName': peerName, 'isVideo': true});
+                  }
+                }
+              },
             ),
             IconButton(
               icon: const Icon(Icons.people_outline),

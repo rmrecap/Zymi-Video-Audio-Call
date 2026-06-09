@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
+import '../../../core/navigation/zymi_routes.dart';
 import '../../../services/api/auth_service.dart';
 import '../../../services/api/friend_service.dart';
 import '../../nearby/screens/nearby_screen.dart' show SkeletonShimmer;
 
-class UserSearchDelegate extends SearchDelegate<String?> {
+class UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?>{
   final FriendService _friendService = FriendService();
 
   @override
-  String get searchFieldLabel => 'Search by username or email';
+  String get searchFieldLabel => 'Search by username, email, or phone';
 
   @override
   ThemeData appBarTheme(BuildContext context) {
@@ -88,10 +89,8 @@ class UserSearchDelegate extends SearchDelegate<String?> {
                   ),
                 ),
                 title: Text(user['username'] ?? '', style: const TextStyle(color: Colors.white)),
-                trailing: IconButton(
-                  icon: const Icon(Icons.person_add, color: ZymiColors.primary),
-                  onPressed: () => _addFriend(context, user['id']),
-                ),
+                subtitle: Text(user['email'] ?? '', style: const TextStyle(color: ZymiColors.textMuted, fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right, color: ZymiColors.textMuted),
                 onTap: () => _showPreview(context, user),
               ),
             );
@@ -121,38 +120,86 @@ class UserSearchDelegate extends SearchDelegate<String?> {
 
   void _showPreview(BuildContext context, Map<String, dynamic> user) {
     final userId = user['id'] as int;
+    final username = user['username'] as String? ?? 'Unknown';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: ZymiColors.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: ZymiColors.primary,
-              child: Text((user['username'] as String)[0].toUpperCase(), style: const TextStyle(fontSize: 24, color: Colors.white)),
-            ),
-            const SizedBox(height: 10),
-            Text(user['username'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 24),
-            _actionButton(ctx, Icons.person_add, 'Add Friend', ZymiColors.primary, () async {
-              Navigator.pop(ctx);
-              final result = await _friendService.sendRequest(userId);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(result['error'] ?? 'Friend request sent!'),
-                    backgroundColor: result['error'] != null ? ZymiColors.danger : ZymiColors.success,
+      builder: (ctx) {
+        return FutureBuilder<String>(
+          future: _friendService.checkStatus(userId),
+          builder: (ctx, snapshot) {
+            final friendshipStatus = snapshot.data ?? 'none';
+            final isFriends = friendshipStatus == 'accepted';
+
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: ZymiColors.primary,
+                    child: Text(
+                      username.isNotEmpty ? username[0].toUpperCase() : '?',
+                      style: const TextStyle(fontSize: 24, color: Colors.white),
+                    ),
                   ),
-                );
-              }
-            }),
-          ],
-        ),
-      ),
+                  const SizedBox(height: 10),
+                  Text(username, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  if (user['email'] != null) ...[
+                    const SizedBox(height: 4),
+                    Text(user['email'], style: const TextStyle(color: ZymiColors.textMuted, fontSize: 13)),
+                  ],
+                  const SizedBox(height: 24),
+                  if (isFriends) ...[
+                    _actionButton(ctx, Icons.chat_bubble, 'Send Message', ZymiColors.primary, () {
+                      Navigator.pop(ctx);
+                      close(context, {'peerId': userId.toString(), 'peerName': username, 'action': 'chat'});
+                    }),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _actionButton(ctx, Icons.call_outlined, 'Audio Call', ZymiColors.success, () {
+                            Navigator.pop(ctx);
+                            close(context, {'peerId': userId.toString(), 'peerName': username, 'action': 'audioCall'});
+                          }),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _actionButton(ctx, Icons.videocam_outlined, 'Video Call', ZymiColors.purple, () {
+                            Navigator.pop(ctx);
+                            close(context, {'peerId': userId.toString(), 'peerName': username, 'action': 'videoCall'});
+                          }),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    _actionButton(ctx, Icons.person_add, 'Add Friend', ZymiColors.primary, () async {
+                      Navigator.pop(ctx);
+                      final result = await _friendService.sendRequest(userId);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['error'] ?? 'Friend request sent!'),
+                            backgroundColor: result['error'] != null ? ZymiColors.danger : ZymiColors.success,
+                          ),
+                        );
+                      }
+                    }),
+                    if (friendshipStatus == 'pending') ...[
+                      const SizedBox(height: 8),
+                      const Text('Friend request already sent', style: TextStyle(color: ZymiColors.textMuted, fontSize: 12)),
+                    ],
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -170,18 +217,6 @@ class UserSearchDelegate extends SearchDelegate<String?> {
         ),
       ),
     );
-  }
-
-  void _addFriend(BuildContext context, dynamic userId) async {
-    final result = await _friendService.sendRequest(userId as int);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['error'] ?? 'Friend request sent!'),
-          backgroundColor: result['error'] != null ? ZymiColors.danger : ZymiColors.success,
-        ),
-      );
-    }
   }
 
   Widget _buildShimmer() {
