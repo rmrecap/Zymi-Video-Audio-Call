@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
-import '../../../core/navigation/zymi_routes.dart';
 import '../../../services/api/auth_service.dart';
+import '../../call/call_launcher.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
@@ -146,10 +146,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   void _startGroupCall(bool isVideo) {
-    Navigator.pushNamed(context, ZymiRoutes.groupCall, arguments: {
-      'groupId': widget.groupId,
-      'groupName': widget.groupName,
-      'isVideo': isVideo,
-    });
+    CallLauncher.startGroupCall(context, groupId: widget.groupId, groupName: widget.groupName, isVideo: isVideo);
   }
 }
