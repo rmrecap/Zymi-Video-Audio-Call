@@ -108,6 +108,8 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
       Permission.microphone,
     ].request();
 
+    if (!mounted) return;
+
     if (statuses[Permission.location]!.isDenied) {
       final goSettings = await showDialog<bool>(
         context: context,
