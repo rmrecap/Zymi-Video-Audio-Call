@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart' as enc;
 
 class EncryptionService {
@@ -14,14 +14,26 @@ class EncryptionService {
     return _encrypter!;
   }
 
+  static String _bytesToHex(Uint8List bytes) {
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  static Uint8List _hexToBytes(String hex) {
+    final buf = <int>[];
+    for (var i = 0; i < hex.length; i += 2) {
+      buf.add(int.parse(hex.substring(i, i + 2), radix: 16));
+    }
+    return Uint8List.fromList(buf);
+  }
+
   static String? decrypt(String encrypted) {
     if (encrypted.isEmpty) return null;
     try {
       final parts = encrypted.split(':');
       if (parts.length < 2) return encrypted;
-      final iv = enc.IV.fromHex(parts[0]);
+      final iv = enc.IV(_hexToBytes(parts[0]));
       final cipherText = parts.sublist(1).join(':');
-      final decrypted = _getEncrypter().decrypt(enc.Encrypted.fromHex(cipherText), iv: iv);
+      final decrypted = _getEncrypter().decrypt(enc.Encrypted(_hexToBytes(cipherText)), iv: iv);
       return decrypted;
     } catch (_) {
       return encrypted;
@@ -33,7 +45,7 @@ class EncryptionService {
     try {
       final iv = enc.IV.fromSecureRandom(16);
       final encrypted = _getEncrypter().encrypt(plain, iv: iv);
-      return '${iv.hex}:${encrypted.hex}';
+      return '${_bytesToHex(iv.bytes)}:${_bytesToHex(encrypted.bytes)}';
     } catch (_) {
       return plain;
     }

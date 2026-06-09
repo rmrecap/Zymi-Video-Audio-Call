@@ -3,16 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
-import '../../../core/navigation/zymi_routes.dart';
 import '../../../services/api/auth_service.dart';
 import '../../../services/api/friend_service.dart';
 import '../../nearby/screens/nearby_screen.dart' show SkeletonShimmer;
-
-class _PhoneLookupResult {
-  final bool found;
-  final Map<String, dynamic>? user;
-  _PhoneLookupResult({required this.found, this.user});
-}
 
 class UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?>{
   final FriendService _friendService = FriendService();

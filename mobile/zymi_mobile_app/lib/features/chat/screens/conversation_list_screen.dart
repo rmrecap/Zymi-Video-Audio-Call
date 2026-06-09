@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/navigation/zymi_routes.dart';
+import '../../../core/theme/zymi_brand_colors.dart';
 import '../widgets/unread_badge.dart';
 
 class ConversationListScreen extends StatelessWidget {
@@ -22,7 +23,7 @@ class ConversationListScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.groups_outlined, color: ZymiColors.primary),
+            icon: Icon(Icons.groups_outlined, color: ZymiColors.primary),
             tooltip: 'Groups',
             onPressed: () => Navigator.pushNamed(context, ZymiRoutes.groupList),
           ),

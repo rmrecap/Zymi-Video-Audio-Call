@@ -24,7 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _gamification;
   List<Map<String, dynamic>> _badges = [];
-  List<Map<String, dynamic>> _achievements = [];
   bool _isLoading = true;
   bool _isEditingStatus = false;
   bool _isEditingName = false;
@@ -48,13 +47,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user != null) {
       final gamification = await _gamificationService.getPoints();
       final badges = await _gamificationService.getBadges();
-      final achievements = await _gamificationService.getAchievements();
       if (mounted) {
         setState(() {
           _profile = user;
           _gamification = gamification;
           _badges = badges;
-          _achievements = achievements;
           _statusController.text = user['status_text'] ?? '';
           _displayNameController.text = user['display_name'] ?? user['username'] ?? '';
           _isLoading = false;

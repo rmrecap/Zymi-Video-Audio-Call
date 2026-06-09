@@ -202,7 +202,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               Navigator.pop(ctx);
               final token = await AuthService().getToken();
               if (token == null) return;
-              await MessageService.editMessage(msg.id, editController.text.trim(), token);
+              await MessageService.editMessage(msg.id!, editController.text.trim(), token);
               _controller.loadHistory();
             },
             child: const Text('Save', style: TextStyle(color: ZymiColors.primary)),
@@ -215,7 +215,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   void _deleteMessage(ZymiMessage msg) async {
     final token = await AuthService().getToken();
     if (token == null) return;
-    await MessageService.deleteMessage(msg.id, token);
+    await MessageService.deleteMessage(msg.id!, token);
     _controller.loadHistory();
   }
 

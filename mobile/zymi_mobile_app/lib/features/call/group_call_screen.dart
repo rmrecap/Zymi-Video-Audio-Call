@@ -20,7 +20,8 @@ class GroupCallScreen extends StatefulWidget {
 }
 
 class _GroupCallScreenState extends State<GroupCallScreen> {
-  final Map<String, MediaStream> _remoteStreams = {};
+  RTCVideoRenderer? _localRenderer;
+  final Map<String, RTCVideoRenderer> _remoteRenderers = {};
   MediaStream? _localStream;
   bool _isMuted = false;
   bool _isSpeakerOn = false;
@@ -28,7 +29,13 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   @override
   void initState() {
     super.initState();
+    _initLocalRenderer();
     _initLocalStream();
+  }
+
+  Future<void> _initLocalRenderer() async {
+    _localRenderer = RTCVideoRenderer();
+    await _localRenderer!.initialize();
   }
 
   Future<void> _initLocalStream() async {
@@ -37,7 +44,12 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
         'audio': true,
         'video': widget.isVideo,
       });
-      if (mounted) setState(() => _localStream = stream);
+      if (mounted) {
+        setState(() {
+          _localStream = stream;
+          _localRenderer?.srcObject = stream;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -50,8 +62,10 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   @override
   void dispose() {
     _localStream?.getTracks().forEach((t) => t.stop());
-    for (final stream in _remoteStreams.values) {
-      stream.getTracks().forEach((t) => t.stop());
+    _localRenderer?.dispose();
+    for (final renderer in _remoteRenderers.values) {
+      renderer.srcObject?.getTracks().forEach((t) => t.stop());
+      renderer.dispose();
     }
     super.dispose();
   }
@@ -76,15 +90,15 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   Widget _buildGrid() {
     final participants = <Widget>[];
 
-    if (_localStream != null) {
+    if (_localRenderer != null) {
       participants.add(_videoTile(
-        RTCVideoView(_localStream!, mirror: true),
+        RTCVideoView(_localRenderer!, mirror: true),
         'You',
         isLocal: true,
       ));
     }
 
-    for (final entry in _remoteStreams.entries) {
+    for (final entry in _remoteRenderers.entries) {
       participants.add(_videoTile(
         RTCVideoView(entry.value),
         entry.key,
