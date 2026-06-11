@@ -40,6 +40,11 @@ class VoiceRecorderService {
   }
 
   void dispose() {
+    if (_isRecording) {
+      _recorder.stop();
+      _isRecording = false;
+      _currentPath = null;
+    }
     _recorder.dispose();
   }
 }

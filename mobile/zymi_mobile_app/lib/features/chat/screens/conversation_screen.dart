@@ -367,8 +367,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (path != null) {
       final file = File(path);
       if (await file.exists()) {
-        _controller.sendMedia(path, 'audio');
+        await _controller.sendMedia(path, 'audio');
       }
+    }
+    // Safety cleanup: remove temp file if still exists
+    if (path != null) {
+      try {
+        final f = File(path);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
     }
   }
 

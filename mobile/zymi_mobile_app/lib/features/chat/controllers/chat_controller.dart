@@ -269,6 +269,7 @@ class ChatController extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Media indexing failed: $e');
+      _cleanupTempFile(path);
     }
   }
 
@@ -283,6 +284,16 @@ class ChatController extends ChangeNotifier {
         'media-transfer-completed', {'to': selectedUserId, 'fileId': fileId});
     _updateMessageMediaStatus(fileId, 'completed');
     await LocalMediaDatabase.updateStatus(fileId, 'completed');
+    _cleanupTempFile(path);
+  }
+
+  void _cleanupTempFile(String path) {
+    try {
+      final file = File(path);
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+    } catch (_) {}
   }
 
   void _addIncoming(Map<String, dynamic> data) {
