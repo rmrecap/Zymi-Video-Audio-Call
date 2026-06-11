@@ -41,13 +41,17 @@ class _MediaMessageBubbleState extends State<MediaMessageBubble> {
       if (mounted) setState(() => _position = p);
     });
     _audioPlayer!.onDurationChanged.listen((d) {
-      if (mounted) setState(() => _duration = d);
+      if (mounted) {
+        setState(() => _duration = d);
+      }
     });
     _audioPlayer!.onPlayerComplete.listen((_) {
-      if (mounted) setState(() {
-        _isPlaying = false;
-        _position = Duration.zero;
-      });
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _position = Duration.zero;
+        });
+      }
     });
 
     if (isLocal) {

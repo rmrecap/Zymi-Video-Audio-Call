@@ -144,7 +144,7 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
             final picker = ImagePicker();
             final source = isCamera ? ImageSource.camera : ImageSource.gallery;
             final picked = await picker.pickImage(source: source, imageQuality: 85);
-            if (picked != null && mounted) {
+            if (picked != null && context.mounted) {
               widget.onMediaSelected(picked.path, 'image');
               Navigator.pop(context);
             }
