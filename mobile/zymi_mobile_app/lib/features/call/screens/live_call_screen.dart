@@ -53,6 +53,8 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
 
   void _endCall() {
     _callController.endCall();
+    _callController.removeListener(_onStateChange);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override

@@ -200,6 +200,23 @@ export const setupChatSocket = (io, userSockets) => {
           unreadCounterService.incrementUnread(to, conversationId);
         }
 
+        // Notify both parties' conversation list to refresh
+        const conversationUpdate = {
+          conversation_id: conversationId,
+          peer_id: from,
+          last_message: messageContent,
+          last_message_time: new Date().toISOString(),
+          unread_count: isOnline ? 0 : 1
+        };
+        io.to(socket.id).emit('conversation-update', conversationUpdate);
+        if (isOnline) {
+          io.to(targetSocketId).emit('conversation-update', {
+            ...conversationUpdate,
+            peer_id: to,
+            unread_count: 1
+          });
+        }
+
         incrementMessagesToday();
         incrementMessagesSent(socket.userId);
       } catch (err) {

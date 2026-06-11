@@ -208,6 +208,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _controller.loadHistory();
   }
 
+  void _openMap(String coords) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Location: $coords'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(ZymiMessage msg) {
     final isMine = msg.isMine;
     if (msg.type == 'media') {
@@ -219,6 +228,64 @@ class _ConversationScreenState extends State<ConversationScreen> {
             isMine: isMine,
             serverMetadata: msg.mediaMetadata,
             onRetry: () => _controller.retryMessage(msg.tempId ?? ''),
+          ),
+        ),
+      );
+    }
+
+    if (msg.type == 'location') {
+      final coords = msg.content.replaceAll('Current Location: ', '').trim();
+      return Align(
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+        child: GestureDetector(
+          onTap: () => _openMap(coords),
+          onLongPress: isMine ? () => _showMessageContextMenu(msg) : null,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            width: 220,
+            decoration: BoxDecoration(
+              color: isMine ? const Color(0xFF3B82F6) : const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Container(
+                    height: 100,
+                    color: const Color(0xFF0F172A),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.map, color: ZymiColors.primary, size: 32),
+                          const SizedBox(height: 4),
+                          Text(
+                            coords,
+                            style: const TextStyle(color: Colors.white54, fontSize: 11),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 16, color: Colors.white70),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text('Location', style: TextStyle(color: Colors.white, fontSize: 13)),
+                      ),
+                      const Icon(Icons.open_in_new, size: 14, color: Colors.white38),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -339,10 +406,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   )
                 : IconButton(
                     key: const ValueKey('mic'),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice recording coming soon')));
-                    },
-                    icon: const Icon(Icons.mic_none_outlined, color: ZymiColors.primary),
+                    onPressed: null,
+                    icon: const Icon(Icons.mic_none_outlined, color: ZymiColors.textMuted),
                   ),
           ),
         ],

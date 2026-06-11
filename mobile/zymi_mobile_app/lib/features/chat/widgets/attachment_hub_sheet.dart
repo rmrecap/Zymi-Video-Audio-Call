@@ -128,6 +128,14 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
   }
 
   Widget _buildGalleryGrid() {
+    final mediaTypes = [
+      {'icon': Icons.image, 'label': 'Photo'},
+      {'icon': Icons.image, 'label': 'Photo'},
+      {'icon': Icons.image, 'label': 'Photo'},
+      {'icon': Icons.image, 'label': 'Photo'},
+      {'icon': Icons.image, 'label': 'Photo'},
+      {'icon': Icons.image, 'label': 'Photo'},
+    ];
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -135,8 +143,9 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: 9, // Placeholder
+      itemCount: mediaTypes.length,
       itemBuilder: (context, index) {
+        final item = mediaTypes[index];
         return GestureDetector(
           onTap: () {
             widget.onMediaSelected('/path/to/image_$index.jpg', 'image');
@@ -147,7 +156,17 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
               color: Colors.white10,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.image, color: Colors.white24, size: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(item['icon'] as IconData, color: Colors.white38, size: 28),
+                const SizedBox(height: 4),
+                Text(
+                  item['label'] as String,
+                  style: const TextStyle(color: Colors.white24, fontSize: 10),
+                ),
+              ],
+            ),
           ),
         );
       },
