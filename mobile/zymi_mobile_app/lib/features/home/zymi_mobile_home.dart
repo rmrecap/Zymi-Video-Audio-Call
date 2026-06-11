@@ -65,8 +65,8 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => IncomingCallScreen(
-            callerId: 'Incoming Call', // In a real app, get this from controller
-            callType: 'video', // In a real app, get this from controller
+            callerId: _callController.peerId ?? 'Unknown Caller',
+            callType: _callController.callType ?? 'audio',
             currentUserId: _localUserId ?? '',
             onReject: () => _callController.rejectCall(_localUserId ?? ''),
             onAccept: () => _callController.acceptCall(_localUserId ?? ''),

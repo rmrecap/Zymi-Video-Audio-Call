@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'screens/live_call_screen.dart';
 import 'group_call_screen.dart';
+import 'controllers/call_controller.dart';
+import '../../services/api/auth_service.dart';
 
 class CallLauncher {
   static Future<void> startCall(BuildContext context, {
@@ -65,6 +67,12 @@ class CallLauncher {
       }
     }
 
+    final authService = AuthService();
+    final user = await authService.getMe();
+    final userId = user?['id']?.toString();
+    if (userId != null) {
+      CallController().startCall(userId, peerId, isVideo ? 'video' : 'audio');
+    }
     if (context.mounted) {
       Navigator.push(
         context,

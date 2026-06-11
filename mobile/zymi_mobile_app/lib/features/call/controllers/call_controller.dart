@@ -27,6 +27,10 @@ class CallController extends ChangeNotifier {
   String? _peerId;
   String? _callType;
 
+  String? get peerId => _peerId;
+  String? get callType => _callType;
+  String? get currentUserId => _currentUserId;
+
   String? peerConnectionState;
   String? iceConnectionState;
   
@@ -242,7 +246,7 @@ class CallController extends ChangeNotifier {
     _peerId = null;
   }
 
-  void endCall({bool emit = true}) async {
+  Future<void> endCall({bool emit = true}) async {
     if (state == CallState.ended || state == CallState.idle) return;
     if (emit && _peerId != null && _currentUserId != null) {
       _signalingService.emitEndCall(_peerId!, _currentUserId!);
@@ -273,7 +277,7 @@ class CallController extends ChangeNotifier {
     _isRemoteDescriptionSet = false;
     _remoteIceCandidates.clear();
     queuedIceCount = 0;
-    _signalingService.removeListeners();
+    // Keep signaling listeners alive for subsequent incoming calls
   }
 
   void toggleCamera(bool enabled) {

@@ -51,8 +51,8 @@ class _LiveCallScreenState extends State<LiveCallScreen> {
     _callController.toggleCamera(_isCameraEnabled);
   }
 
-  void _endCall() {
-    _callController.endCall();
+  Future<void> _endCall() async {
+    await _callController.endCall();
     _callController.removeListener(_onStateChange);
     if (mounted) Navigator.of(context).pop();
   }
