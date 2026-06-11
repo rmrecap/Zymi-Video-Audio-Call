@@ -5,7 +5,6 @@ import 'package:permission_handler/permission_handler.dart';
 class VoiceRecorderService {
   final AudioRecorder _recorder = AudioRecorder();
   bool _isRecording = false;
-  String? _currentPath;
 
   bool get isRecording => _isRecording;
 
@@ -21,7 +20,6 @@ class VoiceRecorderService {
 
     final dir = Directory.systemTemp;
     final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    _currentPath = path;
 
     await _recorder.start(
       const RecordConfig(encoder: AudioEncoder.aacLc),
@@ -35,7 +33,6 @@ class VoiceRecorderService {
     if (!_isRecording) return null;
     final path = await _recorder.stop();
     _isRecording = false;
-    _currentPath = null;
     return path;
   }
 
@@ -43,7 +40,6 @@ class VoiceRecorderService {
     if (_isRecording) {
       _recorder.stop();
       _isRecording = false;
-      _currentPath = null;
     }
     _recorder.dispose();
   }

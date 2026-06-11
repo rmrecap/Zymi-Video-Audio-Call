@@ -276,16 +276,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(10),
+                const Padding(
+                  padding: EdgeInsets.all(10),
                   child: Row(
                     children: [
-                      const Icon(Icons.location_on, size: 16, color: Colors.white70),
-                      const SizedBox(width: 6),
-                      const Expanded(
+                      Icon(Icons.location_on, size: 16, color: Colors.white70),
+                      SizedBox(width: 6),
+                      Expanded(
                         child: Text('Location', style: TextStyle(color: Colors.white, fontSize: 13)),
                       ),
-                      const Icon(Icons.open_in_new, size: 14, color: Colors.white38),
+                      Icon(Icons.open_in_new, size: 14, color: Colors.white38),
                     ],
                   ),
                 ),

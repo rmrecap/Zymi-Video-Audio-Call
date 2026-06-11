@@ -113,6 +113,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                       final peerName = conv['username'] ?? 'Unknown';
                       final lastMessage = conv['last_message'] ?? '';
                       final unread = conv['unread_count'] ?? 0;
+                      final isOnline = conv['is_online'] ?? false;
 
                       return ListTile(
                         leading: Stack(

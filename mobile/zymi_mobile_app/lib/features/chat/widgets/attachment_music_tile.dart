@@ -24,13 +24,11 @@ class AttachmentMusicTile extends StatefulWidget {
 class _AttachmentMusicTileState extends State<AttachmentMusicTile> {
   final AudioPlayer _player = AudioPlayer();
   bool _isPlaying = false;
-  Duration _position = Duration.zero;
   Duration _totalDuration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _player.onPositionChanged.listen((p) => setState(() => _position = p));
     _player.onDurationChanged.listen((d) => setState(() => _totalDuration = d));
     _player.onPlayerComplete.listen((_) => setState(() => _isPlaying = false));
   }
