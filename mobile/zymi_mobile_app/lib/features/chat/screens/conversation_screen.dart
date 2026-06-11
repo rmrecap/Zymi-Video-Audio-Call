@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../controllers/chat_controller.dart';
 import '../models/zymi_message.dart';
@@ -10,6 +11,7 @@ import '../../../core/theme/zymi_brand_colors.dart';
 import '../../../services/api/message_service.dart';
 import '../../../services/api/auth_service.dart';
 import '../../call/call_launcher.dart';
+import '../services/voice_recorder_service.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String peerId;
@@ -29,6 +31,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   late ChatController _controller;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
+  bool _isRecording = false;
 
   @override
   void initState() {
@@ -47,6 +51,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _controller.removeListener(_onStateChanged);
     _messageController.dispose();
     _scrollController.dispose();
+    _voiceRecorder.dispose();
     super.dispose();
   }
 
@@ -347,6 +352,26 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
+  Future<void> _startVoiceRecord() async {
+    if (_isRecording) return;
+    final path = await _voiceRecorder.startRecording();
+    if (path != null) {
+      setState(() => _isRecording = true);
+    }
+  }
+
+  Future<void> _stopVoiceRecord() async {
+    if (!_isRecording) return;
+    final path = await _voiceRecorder.stopRecording();
+    setState(() => _isRecording = false);
+    if (path != null) {
+      final file = File(path);
+      if (await file.exists()) {
+        _controller.sendMedia(path, 'audio');
+      }
+    }
+  }
+
   Widget _buildInputArea(bool hasText) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -404,10 +429,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       icon: const Icon(Icons.send, color: Colors.white),
                     ),
                   )
-                : IconButton(
+                : GestureDetector(
                     key: const ValueKey('mic'),
-                    onPressed: null,
-                    icon: const Icon(Icons.mic_none_outlined, color: ZymiColors.textMuted),
+                    onLongPressStart: (_) => _startVoiceRecord(),
+                    onLongPressEnd: (_) => _stopVoiceRecord(),
+                    child: Icon(
+                      _isRecording ? Icons.mic : Icons.mic_none_outlined,
+                      color: _isRecording ? Colors.redAccent : ZymiColors.textMuted,
+                    ),
                   ),
           ),
         ],

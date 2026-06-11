@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'attachment_category_tab.dart';
 import 'attachment_recent_file_tile.dart';
 import 'attachment_contact_tile.dart';
@@ -128,14 +130,6 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
   }
 
   Widget _buildGalleryGrid() {
-    final mediaTypes = [
-      {'icon': Icons.image, 'label': 'Photo'},
-      {'icon': Icons.image, 'label': 'Photo'},
-      {'icon': Icons.image, 'label': 'Photo'},
-      {'icon': Icons.image, 'label': 'Photo'},
-      {'icon': Icons.image, 'label': 'Photo'},
-      {'icon': Icons.image, 'label': 'Photo'},
-    ];
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -143,13 +137,18 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: mediaTypes.length,
+      itemCount: 2,
       itemBuilder: (context, index) {
-        final item = mediaTypes[index];
+        final isCamera = index == 0;
         return GestureDetector(
-          onTap: () {
-            widget.onMediaSelected('/path/to/image_$index.jpg', 'image');
-            Navigator.pop(context);
+          onTap: () async {
+            final picker = ImagePicker();
+            final source = isCamera ? ImageSource.camera : ImageSource.gallery;
+            final picked = await picker.pickImage(source: source, imageQuality: 85);
+            if (picked != null && mounted) {
+              widget.onMediaSelected(picked.path, 'image');
+              Navigator.pop(context);
+            }
           },
           child: Container(
             decoration: BoxDecoration(
@@ -159,11 +158,11 @@ class _AttachmentHubSheetState extends State<AttachmentHubSheet> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(item['icon'] as IconData, color: Colors.white38, size: 28),
+                Icon(isCamera ? Icons.camera_alt_outlined : Icons.photo_library_outlined, color: Colors.white38, size: 32),
                 const SizedBox(height: 4),
                 Text(
-                  item['label'] as String,
-                  style: const TextStyle(color: Colors.white24, fontSize: 10),
+                  isCamera ? 'Camera' : 'Gallery',
+                  style: const TextStyle(color: Colors.white24, fontSize: 11),
                 ),
               ],
             ),
