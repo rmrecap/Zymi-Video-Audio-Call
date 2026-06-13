@@ -30,7 +30,7 @@ class ConversationScreen extends StatefulWidget {
 }
 
 class _ConversationScreenState extends State<ConversationScreen> {
-  late ChatController _controller;
+  ChatController? _controller;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
@@ -51,14 +51,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (!mounted) return;
     setState(() => _currentUserId = userId);
     _controller = ChatController(currentUserId: userId);
-    _controller.selectedUserId = widget.peerId;
-    _controller.init();
-    _controller.addListener(_onStateChanged);
-    _controller.loadHistory();
+    _controller!.selectedUserId = widget.peerId;
+    _controller!.init();
+    _controller!.addListener(_onStateChanged);
+    _initLoadHistory();
     // Mark conversation as read when screen opens
     _markConversationRead();
     // Bind peer presence
     _bindPresence();
+  }
+
+  Future<void> _initLoadHistory() async {
+    final token = await AuthService().getToken();
+    _controller!.loadHistory(token: token);
   }
 
   void _bindPresence() {
@@ -90,7 +95,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   void dispose() {
     _messageController.removeListener(_onTextChanged);
     if (_currentUserId.isNotEmpty) {
-      _controller.removeListener(_onStateChanged);
+      _controller!.removeListener(_onStateChanged);
     }
     _messageController.dispose();
     _scrollController.dispose();
@@ -123,13 +128,20 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
-    _controller.sendMessage(_messageController.text.trim());
+    _controller!.sendMessage(_messageController.text.trim());
     _messageController.clear();
     FocusScope.of(context).unfocus();
   }
 
   @override
   Widget build(BuildContext context) {
+    final ctrl = _controller;
+    if (ctrl == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0f172a),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final hasText = _messageController.text.trim().isNotEmpty;
 
     return Scaffold(
@@ -140,21 +152,21 @@ class _ConversationScreenState extends State<ConversationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.peerName, style: const TextStyle(fontSize: 16)),
-            Text(
-              _controller.peerTypingId == widget.peerId
-                  ? 'typing...'
-                  : _isPeerOnline
-                      ? 'online'
-                      : 'offline',
-              style: TextStyle(
-                fontSize: 12,
-                color: _controller.peerTypingId == widget.peerId
-                    ? Colors.green
-                    : _isPeerOnline
+              Text(
+                  ctrl.peerTypingId == widget.peerId
+                      ? 'typing...'
+                      : _isPeerOnline
+                          ? 'online'
+                          : 'offline',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: ctrl.peerTypingId == widget.peerId
                         ? Colors.green
-                        : Colors.white38,
-              ),
-            ),
+                        : _isPeerOnline
+                            ? Colors.green
+                            : Colors.white38,
+                  ),
+                ),
           ],
         ),
         actions: [
@@ -184,9 +196,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _controller.messages.length,
+              itemCount: ctrl.messages.length,
               itemBuilder: (context, index) {
-                final msg = _controller.messages[index];
+                final msg = ctrl.messages[index];
                 return _buildMessageBubble(msg);
               },
             ),
@@ -253,7 +265,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               final token = await AuthService().getToken();
               if (token == null) return;
               await MessageService.editMessage(msg.id!, editController.text.trim(), token);
-              _controller.loadHistory();
+    _controller!.loadHistory(token: token);
             },
             child: const Text('Save', style: TextStyle(color: ZymiColors.primary)),
           ),
@@ -266,7 +278,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final token = await AuthService().getToken();
     if (token == null) return;
     await MessageService.deleteMessage(msg.id!, token);
-    _controller.loadHistory();
+    _controller!.loadHistory(token: token);
   }
 
   void _openMap(String coords) {
@@ -288,7 +300,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           child: MediaMessageBubble(
             isMine: isMine,
             serverMetadata: msg.mediaMetadata,
-            onRetry: () => _controller.retryMessage(msg.tempId ?? ''),
+            onRetry: () => _controller!.retryMessage(msg.tempId ?? ''),
           ),
         ),
       );
@@ -483,10 +495,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => AttachmentHubSheet(
         onMediaSelected: (path, type) {
-          _controller.sendMedia(path, type);
+          _controller!.sendMedia(path, type);
         },
         onActionSelected: (content, type) {
-          _controller.sendMessage(content, type: type);
+          _controller!.sendMessage(content, type: type);
         },
       ),
     );
@@ -507,7 +519,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (path != null) {
       final file = File(path);
       if (await file.exists()) {
-        await _controller.sendMedia(path, 'audio');
+        await _controller!.sendMedia(path, 'audio');
       }
     }
     // Safety cleanup: remove temp file if still exists
