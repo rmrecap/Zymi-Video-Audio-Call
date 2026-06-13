@@ -105,34 +105,20 @@ import friendRoutes from './src/routes/friendRoutes.js';
 const app = express();
 const httpServer = createServer(app);
 
-const corsOrigin = config.clientOrigin;
+import { socketCorsOptions } from './src/config/cors.js';
 
 const io = new Server(httpServer, {
-  cors: {
-    origin: [corsOrigin, 'https://rmrecap.github.io'].filter(Boolean),
-    methods: ['GET', 'POST'],
-    credentials: true
-  },
+  cors: socketCorsOptions,
   cookie: true,
   pingTimeout: 60000,
   pingInterval: 25000
 });
 
-const corsOrigins = ['https://rmrecap.github.io', 'http://localhost:3000'];
+import { corsOptions } from './src/config/cors.js';
 
-app.use(cors({
-  origin: corsOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors(corsOptions));
 
-app.options('*', cors({
-  origin: corsOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.options('*', cors(corsOptions));
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
