@@ -96,4 +96,32 @@ class MessageService {
     );
     return response.statusCode == 200;
   }
+
+  /// Fetches a contact card from [POST /api/messages/contact-card].
+  /// Returns a safe map with id/username/avatar/phone or null on failure.
+  static Future<Map<String, dynamic>?> fetchContactCard(
+      String contactUserId, String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/contact-card'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'contactUserId': contactUserId}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Safe-map the contact fields — never crash the rendering loop
+        final contact = data['contact'] as Map<String, dynamic>? ?? {};
+        return {
+          'id': contact['id']?.toString() ?? '',
+          'username': contact['username']?.toString() ?? 'Unknown',
+          'avatar': contact['avatar']?.toString() ?? '',
+          'phone': contact['phone']?.toString() ?? '',
+        };
+      }
+    } catch (_) {}
+    return null;
+  }
 }

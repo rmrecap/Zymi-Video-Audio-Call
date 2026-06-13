@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../controllers/chat_controller.dart';
 import '../models/zymi_message.dart';
@@ -10,6 +11,7 @@ import '../../../core/navigation/zymi_routes.dart';
 import '../../../core/theme/zymi_brand_colors.dart';
 import '../../../services/api/message_service.dart';
 import '../../../services/api/auth_service.dart';
+import '../../../services/realtime/zymi_socket_client.dart';
 import '../../call/call_launcher.dart';
 import '../services/voice_recorder_service.dart';
 
@@ -33,25 +35,68 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final ScrollController _scrollController = ScrollController();
   final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
   bool _isRecording = false;
+  bool _isPeerOnline = false;
+  String _currentUserId = '';
 
   @override
   void initState() {
     super.initState();
     _messageController.addListener(_onTextChanged);
-    _controller = ChatController(currentUserId: 'me');
+    _init();
+  }
+
+  Future<void> _init() async {
+    // Resolve real userId from persistent auth store
+    final userId = await AuthService().getUserId() ?? 'me';
+    if (!mounted) return;
+    setState(() => _currentUserId = userId);
+    _controller = ChatController(currentUserId: userId);
     _controller.selectedUserId = widget.peerId;
     _controller.init();
     _controller.addListener(_onStateChanged);
     _controller.loadHistory();
+    // Mark conversation as read when screen opens
+    _markConversationRead();
+    // Bind peer presence
+    _bindPresence();
+  }
+
+  void _bindPresence() {
+    ZymiSocketClient().onSafe('user-online', (data) {
+      if (data is Map<String, dynamic> &&
+          data['userId']?.toString() == widget.peerId) {
+        if (mounted) setState(() => _isPeerOnline = true);
+      }
+    });
+    ZymiSocketClient().onSafe('user-offline', (data) {
+      if (data is Map<String, dynamic> &&
+          data['userId']?.toString() == widget.peerId) {
+        if (mounted) setState(() => _isPeerOnline = false);
+      }
+    });
+  }
+
+  Future<void> _markConversationRead() async {
+    try {
+      final token = await AuthService().getToken();
+      if (token == null) return;
+      final ids = [_currentUserId, widget.peerId]..sort();
+      final conversationId = ids.join('_');
+      await MessageService.markConversationRead(conversationId, token);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _messageController.removeListener(_onTextChanged);
-    _controller.removeListener(_onStateChanged);
+    if (_currentUserId.isNotEmpty) {
+      _controller.removeListener(_onStateChanged);
+    }
     _messageController.dispose();
     _scrollController.dispose();
     _voiceRecorder.dispose();
+    ZymiSocketClient().offSafe('user-online');
+    ZymiSocketClient().offSafe('user-offline');
     super.dispose();
   }
 
@@ -96,8 +141,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
           children: [
             Text(widget.peerName, style: const TextStyle(fontSize: 16)),
             Text(
-              _controller.peerTypingId == widget.peerId ? 'typing...' : 'online',
-              style: TextStyle(fontSize: 12, color: _controller.peerTypingId == widget.peerId ? Colors.green : Colors.white54),
+              _controller.peerTypingId == widget.peerId
+                  ? 'typing...'
+                  : _isPeerOnline
+                      ? 'online'
+                      : 'offline',
+              style: TextStyle(
+                fontSize: 12,
+                color: _controller.peerTypingId == widget.peerId
+                    ? Colors.green
+                    : _isPeerOnline
+                        ? Colors.green
+                        : Colors.white38,
+              ),
             ),
           ],
         ),
@@ -233,6 +289,90 @@ class _ConversationScreenState extends State<ConversationScreen> {
             isMine: isMine,
             serverMetadata: msg.mediaMetadata,
             onRetry: () => _controller.retryMessage(msg.tempId ?? ''),
+          ),
+        ),
+      );
+    }
+
+    if (msg.type == 'contact') {
+      String name = 'Unknown Contact';
+      String phone = '';
+      try {
+        if (msg.content.startsWith('{')) {
+          final data = jsonDecode(msg.content);
+          name = data['username'] ?? data['name'] ?? 'Unknown Contact';
+          phone = data['phone'] ?? '';
+        } else {
+          final parts = msg.content.replaceFirst('Contact: ', '').split(' (');
+          name = parts[0];
+          if (parts.length > 1) {
+            phone = parts[1].replaceAll(')', '');
+          }
+        }
+      } catch (_) {
+        name = msg.content;
+      }
+
+      return Align(
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+        child: GestureDetector(
+          onLongPress: isMine ? () => _showMessageContextMenu(msg) : null,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(12),
+            width: 240,
+            decoration: BoxDecoration(
+              color: isMine ? const Color(0xFF1E40AF) : const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: ZymiColors.primary.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: ZymiColors.primary.withValues(alpha: 0.2),
+                      child: const Icon(Icons.person, color: ZymiColors.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                          if (phone.isNotEmpty)
+                            Text(phone, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(50, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () {
+                        if (phone.isNotEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Calling $name ($phone)...')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.phone, size: 14, color: ZymiColors.success),
+                      label: const Text('Call', style: TextStyle(color: ZymiColors.success, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       );

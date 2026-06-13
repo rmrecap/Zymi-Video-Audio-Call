@@ -21,6 +21,8 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   bool _isLoading = true;
   StreamSubscription<ZymiSocketStatus>? _statusSub;
   StreamSubscription<dynamic>? _conversationSub;
+  // Track online state locally so socket events update the dot in real-time
+  final Set<String> _onlineUserIds = {};
 
   @override
   void initState() {
@@ -33,6 +35,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       }
     });
     _listenConversationUpdates();
+    _listenPresenceEvents();
   }
 
   void _listenConversationUpdates() {
@@ -42,11 +45,41 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     });
   }
 
+  void _listenPresenceEvents() {
+    ZymiSocketClient().onSafe('user-online', (data) {
+      if (data is Map<String, dynamic>) {
+        final uid = data['userId']?.toString() ?? '';
+        if (uid.isEmpty) return;
+        setState(() {
+          _onlineUserIds.add(uid);
+          for (final c in _conversations) {
+            if (c['peer_id']?.toString() == uid) c['is_online'] = true;
+          }
+        });
+      }
+    });
+
+    ZymiSocketClient().onSafe('user-offline', (data) {
+      if (data is Map<String, dynamic>) {
+        final uid = data['userId']?.toString() ?? '';
+        if (uid.isEmpty) return;
+        setState(() {
+          _onlineUserIds.remove(uid);
+          for (final c in _conversations) {
+            if (c['peer_id']?.toString() == uid) c['is_online'] = false;
+          }
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
     _statusSub?.cancel();
     _conversationSub?.cancel();
     ZymiSocketClient().offSafe('conversation-update');
+    ZymiSocketClient().offSafe('user-online');
+    ZymiSocketClient().offSafe('user-offline');
     super.dispose();
   }
 
@@ -113,7 +146,8 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                       final peerName = conv['username'] ?? 'Unknown';
                       final lastMessage = conv['last_message'] ?? '';
                       final unread = conv['unread_count'] ?? 0;
-                      final isOnline = conv['is_online'] ?? false;
+                      // Merge API-reported status with live socket events
+                      final isOnline = _onlineUserIds.contains(peerId) || (conv['is_online'] ?? false);
 
                       return ListTile(
                         leading: Stack(
