@@ -1,7 +1,8 @@
 class ZymiWebRTCConfig {
   static const Map<String, dynamic> rtcConfiguration = {
     'iceServers': [
-      {'url': 'stun:stun.l.google.com:19302'},
+      {'urls': 'stun:stun.l.google.com:19302'},
+      {'urls': 'stun:stun1.l.google.com:19302'}
     ],
     // 'sdpSemantics': 'unified-plan'
   };

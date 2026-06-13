@@ -20,9 +20,15 @@ class IceServerService {
         final List<dynamic> data = jsonDecode(response.body);
         return data.cast<Map<String, dynamic>>();
       }
-      return [{'urls': 'stun:stun.l.google.com:19302'}];
+      return [
+        {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun1.l.google.com:19302'}
+      ];
     } catch (e) {
-      return [{'urls': 'stun:stun.l.google.com:19302'}];
+      return [
+        {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun1.l.google.com:19302'}
+      ];
     }
   }
 }

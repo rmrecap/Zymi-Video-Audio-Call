@@ -76,10 +76,10 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
       }
     };
 
-    const safeBroadcast = (targetSocketId, event, data) => {
+    const safeBroadcast = (targetRoomId, event, data) => {
       try {
-        if (targetSocketId) {
-          io.to(targetSocketId).emit(event, data);
+        if (targetRoomId) {
+          io.to(targetRoomId).emit(event, data);
         }
       } catch (err) {
         console.error('[CALL_SOCKET] Broadcast error:', err);
@@ -166,8 +166,8 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
             if (removePendingCall(from)) {
               const timedOutCall = await handleCallTimeout(from);
               if (timedOutCall) {
-                safeBroadcast(userSockets.get(from), SOCKET_EVENTS.CALL_TIMEOUT, { to, callId: timedOutCall.id });
-                safeBroadcast(targetSocketId, SOCKET_EVENTS.CALL_REJECTED, { reason: 'Call timed out' });
+                safeBroadcast(from, SOCKET_EVENTS.CALL_TIMEOUT, { to, callId: timedOutCall.id });
+                safeBroadcast(to, SOCKET_EVENTS.CALL_REJECTED, { reason: 'Call timed out' });
                 logAudit(from, 'call_timeout', to, `Call timed out after ${CALL_TIMEOUT_MS}ms`);
 
                 // Phase 57: Missed call notification
@@ -189,7 +189,8 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
         const senderInfo = await get('SELECT username, avatar FROM users WHERE id = $1', [from]);
         const iceServers = await getActiveIceServers();
 
-        safeBroadcast(targetSocketId, SOCKET_EVENTS.INCOMING_CALL, { 
+        // Emit call-user event to the target user's room to notify all active isolates (UI & Background)
+        safeBroadcast(to, SOCKET_EVENTS.INCOMING_CALL, { 
           from, 
           offer, 
           type,
@@ -230,7 +231,7 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
         // Register active call
         registerActiveCall(socket.userId, to, currentCall?.id);
 
-        safeBroadcast(userSockets.get(to), SOCKET_EVENTS.CALL_ANSWER, { answer });
+        safeBroadcast(to, SOCKET_EVENTS.CALL_ANSWER, { answer });
       } catch (err) {
         console.error('[CALL_SOCKET] MAKE_ANSWER error:', err);
         callActivity.failedCalls++;
@@ -250,7 +251,7 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
         if (!socket.tokenVersion || !(await checkToken(socket, socket.userId))) {
           return;
         }
-        safeBroadcast(userSockets.get(to), SOCKET_EVENTS.ICE_CANDIDATE, { candidate });
+        safeBroadcast(to, SOCKET_EVENTS.ICE_CANDIDATE, { candidate });
       } catch (err) {
         console.error('[CALL_SOCKET] ICE_CANDIDATE error:', err);
         callActivity.failedCalls++;
@@ -278,10 +279,7 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
         // Clear active call
         clearActiveCall(socket.userId, to);
 
-        const targetSocket = userSockets.get(String(to)) || userSockets.get(to);
-        if (targetSocket) {
-          io.to(targetSocket).emit(SOCKET_EVENTS.CALL_ENDED, { from });
-        }
+        io.to(to).emit(SOCKET_EVENTS.CALL_ENDED, { from });
       } catch (err) {
         console.error('[CALL_SOCKET] END_CALL error:', err);
         callActivity.failedCalls++;
@@ -307,10 +305,7 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
         // Clear active call (if any)
         clearActiveCall(socket.userId, to);
 
-        const targetSocket = userSockets.get(String(to)) || userSockets.get(to);
-        if (targetSocket) {
-          io.to(targetSocket).emit(SOCKET_EVENTS.CALL_REJECTED, { from });
-        }
+        io.to(to).emit(SOCKET_EVENTS.CALL_REJECTED, { from });
         logAudit(socket.userId, 'call_rejected', to, 'Call rejected');
       } catch (err) {
         console.error('[CALL_SOCKET] REJECT_CALL error:', err);
@@ -617,19 +612,13 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
     socket.on('ice-retry-requested', (data) => {
       const { to, reason } = data;
       if (!to) return;
-      const targetSocket = userSockets.get(String(to));
-      if (targetSocket) {
-        io.to(targetSocket).emit('ice-retry-requested', { from: socket.userId, reason });
-      }
+      io.to(String(to)).emit('ice-retry-requested', { from: socket.userId, reason });
     });
 
     socket.on('relay-mode-activated', (data) => {
       const { to } = data;
       if (!to) return;
-      const targetSocket = userSockets.get(String(to));
-      if (targetSocket) {
-        io.to(targetSocket).emit('relay-mode-activated', { from: socket.userId });
-      }
+      io.to(String(to)).emit('relay-mode-activated', { from: socket.userId });
     });
   });
 };

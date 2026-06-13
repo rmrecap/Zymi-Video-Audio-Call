@@ -137,6 +137,7 @@ class CallController extends ChangeNotifier {
       localRenderer.srcObject = stream;
       if (callType == 'video') runtimeStateBinder.setCameraActive(true);
       runtimeStateBinder.setMicActive(true);
+      notifyListeners(); // Force rendering track assignment update to UI thread
     } else {
       _setState(CallState.failed);
       return;
@@ -155,7 +156,13 @@ class CallController extends ChangeNotifier {
     _peerConnectionService.onAddTrack = (track, receiver) {
       if (track.kind == 'video') {
         remoteRenderer.srcObject = _peerConnectionService.peerConnection?.getRemoteStreams().firstOrNull;
+        notifyListeners(); // Rebuild UI with remote stream track
       }
+    };
+
+    _peerConnectionService.onAddStream = (stream) {
+      remoteRenderer.srcObject = stream;
+      notifyListeners(); // Rebuild UI with remote media stream
     };
     
     _peerConnectionService.onConnectionState = (pcState) {
@@ -190,6 +197,7 @@ class CallController extends ChangeNotifier {
       localRenderer.srcObject = stream;
       if (_callType == 'video') runtimeStateBinder.setCameraActive(true);
       runtimeStateBinder.setMicActive(true);
+      notifyListeners(); // Force rendering track assignment update to UI thread
     }
 
     await _peerConnectionService.initialize();
@@ -205,7 +213,13 @@ class CallController extends ChangeNotifier {
     _peerConnectionService.onAddTrack = (track, receiver) {
       if (track.kind == 'video') {
         remoteRenderer.srcObject = _peerConnectionService.peerConnection?.getRemoteStreams().firstOrNull;
+        notifyListeners(); // Rebuild UI with remote stream track
       }
+    };
+
+    _peerConnectionService.onAddStream = (stream) {
+      remoteRenderer.srcObject = stream;
+      notifyListeners(); // Rebuild UI with remote media stream
     };
     
     _peerConnectionService.onConnectionState = (pcState) {

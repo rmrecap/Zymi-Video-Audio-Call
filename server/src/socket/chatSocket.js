@@ -135,11 +135,10 @@ export const setupChatSocket = (io, userSockets) => {
         // Encrypt message content for at-rest zero-knowledge
         const encryptedContent = encrypt(messageContent) || messageContent;
 
-        const targetSocketId = userSockets.get(to);
-        const isOnline = !!targetSocketId;
+        // Room-based online check — works with both UI and BACKGROUND isolates
+        const isOnline = userSockets.has(to);
 
         // Phase 57: Store message with delivery status
-        // Note: messageQueueService.enqueueMessage might need to be async if it hits DB
         const messageId = await messageQueueService.enqueueMessage({
           sender_id: from,
           receiver_id: to,
@@ -182,8 +181,8 @@ export const setupChatSocket = (io, userSockets) => {
         io.to(socket.id).emit('message-sent', { tempId, id: message.id });
 
         if (isOnline) {
-          io.to(targetSocketId).emit(SOCKET_EVENTS.NEW_MESSAGE, { ...message, tempId: undefined });
-          io.to(targetSocketId).emit('receive_message', { ...message, tempId: undefined });
+          io.to(to).emit(SOCKET_EVENTS.NEW_MESSAGE, { ...message, tempId: undefined });
+          io.to(to).emit('receive_message', { ...message, tempId: undefined });
         } else {
           // Phase 57: Notification for offline user
           const sender = await get('SELECT username FROM users WHERE id = $1', [from]);
@@ -229,10 +228,7 @@ export const setupChatSocket = (io, userSockets) => {
         const { to, from } = data || {};
         if (!to) return;
 
-        const targetSocketId = userSockets.get(String(to)) || userSockets.get(to);
-        if (targetSocketId) {
-          io.to(targetSocketId).emit(SOCKET_EVENTS.USER_TYPING, { from: String(from) });
-        }
+        io.to(String(to)).emit(SOCKET_EVENTS.USER_TYPING, { from: String(from) });
         incrementTypingEvents();
       } catch (err) {
         console.error('[CHAT_SOCKET] TYPING error:', err);
@@ -244,10 +240,7 @@ export const setupChatSocket = (io, userSockets) => {
         const { to, from } = data || {};
         if (!to) return;
 
-        const targetSocketId = userSockets.get(String(to)) || userSockets.get(to);
-        if (targetSocketId) {
-          io.to(targetSocketId).emit(SOCKET_EVENTS.USER_STOP_TYPING, { from: String(from) });
-        }
+        io.to(String(to)).emit(SOCKET_EVENTS.USER_STOP_TYPING, { from: String(from) });
       } catch (err) {
         console.error('[CHAT_SOCKET] STOP_TYPING error:', err);
       }
@@ -258,10 +251,7 @@ export const setupChatSocket = (io, userSockets) => {
         const { messageId, senderId, receiverId } = data || {};
         if (!messageId || !senderId) return;
         
-        const senderSocketId = userSockets.get(String(senderId));
-        if (senderSocketId) {
-          io.to(senderSocketId).emit('message-status-update', { messageId, status: 'delivered', receiverId });
-        }
+        io.to(String(senderId)).emit('message-status-update', { messageId, status: 'delivered', receiverId });
       } catch (err) {
         console.error('[CHAT_SOCKET] message-delivered error:', err);
       }
@@ -274,10 +264,7 @@ export const setupChatSocket = (io, userSockets) => {
         
         await run('UPDATE messages SET is_read = 1 WHERE id = $1', [messageId]);
         
-        const senderSocketId = userSockets.get(String(senderId));
-        if (senderSocketId) {
-          io.to(senderSocketId).emit('message-status-update', { messageId, status: 'read', receiverId });
-        }
+        io.to(String(senderId)).emit('message-status-update', { messageId, status: 'read', receiverId });
       } catch (err) {
         console.error('[CHAT_SOCKET] message-read error:', err);
       }
@@ -288,10 +275,7 @@ export const setupChatSocket = (io, userSockets) => {
       try {
         const { to, fileId, metadata } = data || {};
         if (!to || !fileId) return;
-        const targetSocketId = userSockets.get(String(to));
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('media-transfer-offer', { from: socket.userId, fileId, metadata });
-        }
+        io.to(String(to)).emit('media-transfer-offer', { from: socket.userId, fileId, metadata });
       } catch (err) {
         console.error('[CHAT_SOCKET] media-transfer-offer error:', err);
       }
@@ -301,10 +285,7 @@ export const setupChatSocket = (io, userSockets) => {
       try {
         const { to, fileId, signalData } = data || {};
         if (!to || !fileId) return;
-        const targetSocketId = userSockets.get(String(to));
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('media-transfer-accept', { from: socket.userId, fileId, signalData });
-        }
+        io.to(String(to)).emit('media-transfer-accept', { from: socket.userId, fileId, signalData });
       } catch (err) {
         console.error('[CHAT_SOCKET] media-transfer-accept error:', err);
       }
@@ -313,10 +294,7 @@ export const setupChatSocket = (io, userSockets) => {
     socket.on('media-transfer-ready', (data) => {
       try {
         const { to, fileId } = data || {};
-        const targetSocketId = userSockets.get(String(to));
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('media-transfer-ready', { from: socket.userId, fileId });
-        }
+        io.to(String(to)).emit('media-transfer-ready', { from: socket.userId, fileId });
       } catch (err) {
         console.error('[CHAT_SOCKET] media-transfer-ready error:', err);
       }
@@ -325,10 +303,7 @@ export const setupChatSocket = (io, userSockets) => {
     socket.on('media-transfer-progress', (data) => {
       try {
         const { to, fileId, progress } = data || {};
-        const targetSocketId = userSockets.get(String(to));
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('media-transfer-progress', { from: socket.userId, fileId, progress });
-        }
+        io.to(String(to)).emit('media-transfer-progress', { from: socket.userId, fileId, progress });
       } catch (err) {
         console.error('[CHAT_SOCKET] media-transfer-progress error:', err);
       }
@@ -337,10 +312,7 @@ export const setupChatSocket = (io, userSockets) => {
     socket.on('media-transfer-completed', (data) => {
       try {
         const { to, fileId } = data || {};
-        const targetSocketId = userSockets.get(String(to));
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('media-transfer-completed', { from: socket.userId, fileId });
-        }
+        io.to(String(to)).emit('media-transfer-completed', { from: socket.userId, fileId });
       } catch (err) {
         console.error('[CHAT_SOCKET] media-transfer-completed error:', err);
       }
@@ -349,10 +321,7 @@ export const setupChatSocket = (io, userSockets) => {
     socket.on('media-transfer-failed', (data) => {
       try {
         const { to, fileId, reason } = data || {};
-        const targetSocketId = userSockets.get(String(to));
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('media-transfer-failed', { from: socket.userId, fileId, reason });
-        }
+        io.to(String(to)).emit('media-transfer-failed', { from: socket.userId, fileId, reason });
       } catch (err) {
         console.error('[CHAT_SOCKET] media-transfer-failed error:', err);
       }
@@ -361,10 +330,7 @@ export const setupChatSocket = (io, userSockets) => {
     socket.on('media-transfer-cancelled', (data) => {
       try {
         const { to, fileId } = data || {};
-        const targetSocketId = userSockets.get(String(to));
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('media-transfer-cancelled', { from: socket.userId, fileId });
-        }
+        io.to(String(to)).emit('media-transfer-cancelled', { from: socket.userId, fileId });
       } catch (err) {
         console.error('[CHAT_SOCKET] media-transfer-cancelled error:', err);
       }

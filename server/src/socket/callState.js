@@ -24,20 +24,7 @@ export const cleanupUserActiveCall = async (userId, io, userSockets) => {
   const active = activeCalls.get(userIdStr);
   if (!active) return;
 
-  // Try registry first (UI socket preferred for active call peer), fall back to local Map
-  let peerSocketId = null;
-  try {
-    peerSocketId = await registry.getSocket(String(active.peerId), 'UI');
-  } catch (err) {
-    // Registry unavailable
-  }
-  if (!peerSocketId) {
-    peerSocketId = userSockets.get(String(active.peerId));
-  }
-
-  if (peerSocketId) {
-    io.to(peerSocketId).emit(SOCKET_EVENTS.CALL_ENDED, { from: userIdStr, reason: 'peer-disconnected' });
-  }
+  io.to(String(active.peerId)).emit(SOCKET_EVENTS.CALL_ENDED, { from: userIdStr, reason: 'peer-disconnected' });
   activeCalls.delete(userIdStr);
   activeCalls.delete(String(active.peerId));
 };

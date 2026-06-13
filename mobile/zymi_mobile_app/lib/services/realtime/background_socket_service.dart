@@ -102,18 +102,23 @@ void onStart(ServiceInstance service) async {
       return;
     }
 
-    socket = io.io(AppConfig.apiUrl, <String, dynamic>{
-      'transports': ['websocket'],
-      'autoConnect': true,
-      'reconnection': true,
+    final Map<String, dynamic> socketOptions = io.OptionBuilder()
+        .setTransports(['websocket'])
+        .enableForceNew()
+        .enableAutoConnect()
+        .enableReconnection()
+        .setAuth({
+          'token': token,
+          'type': 'BACKGROUND', // Socket Type Protocol: identifies this as the persistent daemon
+        })
+        .build();
+    socketOptions.addAll({
       'reconnectionAttempts': double.infinity,
       'reconnectionDelay': 2000,
       'reconnectionDelayMax': 10000,
-      'auth': {
-        'token': token,
-        'type': 'BACKGROUND', // Socket Type Protocol: identifies this as the persistent daemon
-      },
     });
+
+    socket = io.io(AppConfig.apiUrl, socketOptions);
 
     socket!.onConnect((_) {
       debugPrint('[BG_SOCKET] Connected to server');
@@ -182,15 +187,19 @@ void onStart(ServiceInstance service) async {
       // Notify the UI isolate to show the incoming call screen
       service.invoke('showIncomingCall', data is Map<String, dynamic> ? data : {'raw': data.toString()});
 
-      // Wait for call termination to release WakeLock and log telemetry
-      socket!.once('call-terminated', (_) async {
+      // Helper function to stop ringtone and release wakelock
+      void terminateCall() async {
         final duration = DateTime.now().difference(startTime).inSeconds;
         service.invoke('log_telemetry', {
           'event': 'wakelock_released',
           'duration': duration,
         });
         FlutterRingtonePlayer().stop();
-      });
+      }
+
+      // Wait for call termination to release WakeLock and log telemetry
+      socket!.once('call-ended', (_) => terminateCall());
+      socket!.once('call-rejected', (_) => terminateCall());
     });
 
     // Heartbeat acknowledgment from server
