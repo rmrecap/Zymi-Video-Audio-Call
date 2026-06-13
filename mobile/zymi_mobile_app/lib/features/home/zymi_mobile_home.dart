@@ -53,6 +53,9 @@ class _ZymiMobileHomeState extends State<ZymiMobileHome> {
         Navigator.pushReplacementNamed(context, ZymiRoutes.login);
         return;
       }
+      if (status == ZymiSocketStatus.connected && _localUserId != null) {
+        _presenceService.join(_localUserId!);
+      }
       setState(() {});
     });
     _callController.addListener(_handleCallStateChange);
