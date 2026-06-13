@@ -118,9 +118,12 @@ void onStart(ServiceInstance service) async {
       'reconnectionDelayMax': 10000,
     });
 
+    print('[Socket Config] BACKGROUND Socket connection attempt. Transports: ${socketOptions['transports']}');
+
     socket = io.io(AppConfig.apiUrl, socketOptions);
 
     socket!.onConnect((_) {
+      print('[Socket Log] Connected - Transport: WebSockets');
       debugPrint('[BG_SOCKET] Connected to server');
       service.invoke('updateNotification', {
         'title': 'ZYMI',
@@ -130,7 +133,8 @@ void onStart(ServiceInstance service) async {
       socket!.emit('policy-fetch');
     });
 
-    socket!.onDisconnect((_) {
+    socket!.onDisconnect((data) {
+      print('[Socket Log] Disconnected! Reason: $data');
       debugPrint('[BG_SOCKET] Disconnected from server');
       service.invoke('updateNotification', {
         'title': 'ZYMI',
@@ -139,6 +143,7 @@ void onStart(ServiceInstance service) async {
     });
 
     socket!.onConnectError((err) {
+      print('[Socket Log] Connection Error: $err');
       debugPrint('[BG_SOCKET] Connection error: $err');
     });
 

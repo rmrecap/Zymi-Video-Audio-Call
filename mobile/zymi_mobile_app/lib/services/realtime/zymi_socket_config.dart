@@ -1,7 +1,7 @@
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class ZymiSocketConfig {
-  static const String baseUrl = String.fromEnvironment('API_URL', defaultValue: 'https://zymi-server.onrender.com');
+  static const String baseUrl = String.fromEnvironment('API_URL', defaultValue: 'http://localhost:8080');
   
   /// Get socket options for the UI (Main Isolate) socket connection.
   /// type=UI identifies this as the volatile view socket.
@@ -16,6 +16,8 @@ class ZymiSocketConfig {
           'type': 'UI', // Socket Type Protocol: volatile UI socket
         })
         .build();
+
+    print('[Socket Config] Main UI Socket connection attempt. Transports: ${options['transports']}');
 
     options.addAll({
       'reconnectionAttempts': 5,

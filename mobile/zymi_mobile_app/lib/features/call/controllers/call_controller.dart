@@ -88,9 +88,11 @@ class CallController extends ChangeNotifier {
 
     _signalingService.listenCallAnswer((data) async {
       final answer = data['answer'];
+      print('[WebRTC Debug] setRemoteDescription (Answer) START: type=${answer['type']}');
       await _peerConnectionService.peerConnection?.setRemoteDescription(
         RTCSessionDescription(answer['sdp'], answer['type']),
       );
+      print('[WebRTC Debug] setRemoteDescription (Answer) END');
       _isRemoteDescriptionSet = true;
       _processQueuedCandidates();
     });
@@ -134,10 +136,15 @@ class CallController extends ChangeNotifier {
 
     final stream = await _mediaService.getUserMedia(isVideo: callType == 'video');
     if (stream != null) {
-      localRenderer.srcObject = stream;
-      if (callType == 'video') runtimeStateBinder.setCameraActive(true);
-      runtimeStateBinder.setMicActive(true);
-      notifyListeners(); // Force rendering track assignment update to UI thread
+      try {
+        localRenderer.srcObject = stream;
+        if (callType == 'video') runtimeStateBinder.setCameraActive(true);
+        runtimeStateBinder.setMicActive(true);
+        notifyListeners(); // Force rendering track assignment update to UI thread
+        print('[WebRTC Debug] MediaStream tracks state (video): ${stream.getVideoTracks().map((t) => "id: ${t.id}, enabled: ${t.enabled}, kind: ${t.kind}").toList()}');
+      } catch (e) {
+        print('[WebRTC Debug] Error assigning local media stream: $e');
+      }
     } else {
       _setState(CallState.failed);
       return;
@@ -146,11 +153,13 @@ class CallController extends ChangeNotifier {
     await _peerConnectionService.initialize();
     
     _peerConnectionService.onIceCandidate = (candidate) {
+      print('[WebRTC Debug] onIceCandidate TRIGGERED (Local): sdpMid=${candidate.sdpMid}, candidate=${candidate.candidate}');
       _signalingService.emitIceCandidate(peerId, {
         'candidate': candidate.candidate,
         'sdpMid': candidate.sdpMid,
         'sdpMLineIndex': candidate.sdpMLineIndex,
       });
+      print('[WebRTC Debug] onIceCandidate EMITTED (Local)');
     };
     
     _peerConnectionService.onAddTrack = (track, receiver) {
@@ -178,7 +187,9 @@ class CallController extends ChangeNotifier {
 
     final offer = await _peerConnectionService.peerConnection?.createOffer(ZymiWebRTCConfig.offerConstraints);
     if (offer != null) {
+      print('[WebRTC Debug] setLocalDescription (Offer) START');
       await _peerConnectionService.peerConnection?.setLocalDescription(offer);
+      print('[WebRTC Debug] setLocalDescription (Offer) END');
       _signalingService.emitCallUser(peerId, currentUserId, {
         'sdp': offer.sdp,
         'type': offer.type,
@@ -194,20 +205,27 @@ class CallController extends ChangeNotifier {
     
     final stream = await _mediaService.getUserMedia(isVideo: _callType == 'video');
     if (stream != null) {
-      localRenderer.srcObject = stream;
-      if (_callType == 'video') runtimeStateBinder.setCameraActive(true);
-      runtimeStateBinder.setMicActive(true);
-      notifyListeners(); // Force rendering track assignment update to UI thread
+      try {
+        localRenderer.srcObject = stream;
+        if (_callType == 'video') runtimeStateBinder.setCameraActive(true);
+        runtimeStateBinder.setMicActive(true);
+        notifyListeners(); // Force rendering track assignment update to UI thread
+        print('[WebRTC Debug] MediaStream tracks state (video): ${stream.getVideoTracks().map((t) => "id: ${t.id}, enabled: ${t.enabled}, kind: ${t.kind}").toList()}');
+      } catch (e) {
+        print('[WebRTC Debug] Error assigning local media stream: $e');
+      }
     }
 
     await _peerConnectionService.initialize();
     
     _peerConnectionService.onIceCandidate = (candidate) {
+      print('[WebRTC Debug] onIceCandidate TRIGGERED (Local/Answer): sdpMid=${candidate.sdpMid}, candidate=${candidate.candidate}');
       _signalingService.emitIceCandidate(_peerId!, {
         'candidate': candidate.candidate,
         'sdpMid': candidate.sdpMid,
         'sdpMLineIndex': candidate.sdpMLineIndex,
       });
+      print('[WebRTC Debug] onIceCandidate EMITTED (Local/Answer)');
     };
     
     _peerConnectionService.onAddTrack = (track, receiver) {
@@ -235,15 +253,19 @@ class CallController extends ChangeNotifier {
       await _peerConnectionService.addLocalStream(stream);
     }
 
+    print('[WebRTC Debug] setRemoteDescription (Offer) START: type=${_remoteOffer['type']}');
     await _peerConnectionService.peerConnection?.setRemoteDescription(
       RTCSessionDescription(_remoteOffer['sdp'], _remoteOffer['type']),
     );
+    print('[WebRTC Debug] setRemoteDescription (Offer) END');
     _isRemoteDescriptionSet = true;
     _processQueuedCandidates();
 
     final answer = await _peerConnectionService.peerConnection?.createAnswer();
     if (answer != null) {
+      print('[WebRTC Debug] setLocalDescription (Answer) START');
       await _peerConnectionService.peerConnection?.setLocalDescription(answer);
+      print('[WebRTC Debug] setLocalDescription (Answer) END');
       _signalingService.emitMakeAnswer(_peerId!, {
         'sdp': answer.sdp,
         'type': answer.type,

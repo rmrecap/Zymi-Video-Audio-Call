@@ -68,6 +68,10 @@ export const setupCallSocket = (io, userSockets, callActivity) => {
   io.on('connection', (socket) => {
     console.log('[CALL_SOCKET] User connected:', socket.id);
 
+    socket.onAny((event, ...args) => {
+      console.log(`[Stream Log] Call Socket received: "${event}" with payload:`, JSON.stringify(args));
+    });
+
     const safeEmit = (event, data) => {
       try {
         socket.emit(event, data);

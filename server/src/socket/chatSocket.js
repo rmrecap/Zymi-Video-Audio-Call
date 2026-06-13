@@ -28,6 +28,10 @@ export const setupChatSocket = (io, userSockets) => {
   io.on('connection', (socket) => {
     console.log('[SOCKET] User connected:', socket.id);
 
+    socket.onAny((event, ...args) => {
+      console.log(`[Stream Log] Chat Socket received: "${event}" with payload:`, JSON.stringify(args));
+    });
+
     socket.on(SOCKET_EVENTS.JOIN, async (userId) => {
       try {
         if (!userId) return;

@@ -29,6 +29,7 @@ class ZymiSocketClient {
     _socket = io.io(ZymiSocketConfig.baseUrl, ZymiSocketConfig.getOptions(token));
 
     _socket!.onConnect((_) async {
+      print('[Socket Log] Connected - Transport: WebSockets');
       debugPrint('[SOCKET] Connected');
       _currentStatus = ZymiSocketStatus.connected;
       _statusController.add(_currentStatus);
@@ -48,13 +49,15 @@ class ZymiSocketClient {
       }
     });
 
-    _socket!.onDisconnect((_) {
+    _socket!.onDisconnect((data) {
+      print('[Socket Log] Disconnected! Reason: $data');
       debugPrint('[SOCKET] Disconnected');
       _currentStatus = ZymiSocketStatus.disconnected;
       _statusController.add(_currentStatus);
     });
 
     _socket!.onConnectError((err) {
+      print('[Socket Log] Connection Error: $err');
       debugPrint('[SOCKET] Connect Error: $err');
       final msg = err.toString().toLowerCase();
       if (msg.contains('invalid token') || msg.contains('token expired') || msg.contains('authentication required')) {

@@ -38,18 +38,21 @@ class ChatController extends ChangeNotifier {
     final msgSocketService = MessageSocketService();
 
     chatService.listenReceiveMessage((data) {
+      print('[Stream Log] ChatController received private message: $data');
       if (data is Map<String, dynamic>) {
         _addIncoming(data);
       }
     });
 
     chatService.listenNewMessage((data) {
+      print('[Stream Log] ChatController received new message: $data');
       if (data is Map<String, dynamic>) {
         _addIncoming(data);
       }
     });
 
     msgSocketService.listenPendingMessages((list) {
+      print('[Stream Log] ChatController received pending messages list: $list');
       for (var data in list) {
         if (data is Map<String, dynamic>) {
           _addIncoming(data);
@@ -58,11 +61,13 @@ class ChatController extends ChangeNotifier {
     });
 
     msgSocketService.listenUnreadUpdate((data) {
+      print('[Stream Log] ChatController received unread count update: $data');
       totalUnreadCount = data['total'] ?? 0;
       notifyListeners();
     });
 
     chatService.listenMessageSent((data) {
+      print('[Stream Log] ChatController received message sent receipt: $data');
       if (data is Map<String, dynamic>) {
         final tempId = data['tempId']?.toString();
         final serverId = data['id'];
@@ -79,11 +84,13 @@ class ChatController extends ChangeNotifier {
     });
 
     chatService.listenUserTyping((data) {
+      print('[Stream Log] ChatController received typing notification: $data');
       peerTypingId = data?['from']?.toString();
       notifyListeners();
     });
 
     chatService.listenUserStopTyping((data) {
+      print('[Stream Log] ChatController received stop-typing notification: $data');
       if (peerTypingId == data?['from']?.toString()) {
         peerTypingId = null;
         notifyListeners();
